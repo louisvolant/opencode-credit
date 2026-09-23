@@ -2,6 +2,7 @@ import Foundation
 
 runSuite("OpenCode Credit core tests") {
     UsageTests.run()
+    ConfigTests.run()
 }
 
 print("")
