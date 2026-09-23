@@ -13,6 +13,8 @@ final class Settings {
     private enum Key {
         static let refreshIntervalMinutes = "refreshIntervalMinutes"
         static let showPercentInMenuBar = "showPercentInMenuBar"
+        static let notificationsEnabled = "notificationsEnabled"
+        static let notificationThreshold = "notificationThreshold"
         static let cachedUsage = "cachedUsage"
     }
 
@@ -35,6 +37,24 @@ final class Settings {
         }
         set {
             defaults.set(newValue, forKey: Key.showPercentInMenuBar)
+        }
+    }
+
+    /// Whether to post a local notification when a window crosses the
+    /// threshold. Defaults to false.
+    var notificationsEnabled: Bool {
+        get { defaults.bool(forKey: Key.notificationsEnabled) }
+        set { defaults.set(newValue, forKey: Key.notificationsEnabled) }
+    }
+
+    /// Percentage at which a notification is posted. Defaults to 80.
+    var notificationThreshold: Int {
+        get {
+            let value = defaults.integer(forKey: Key.notificationThreshold)
+            return value > 0 ? value : 80
+        }
+        set {
+            defaults.set(newValue, forKey: Key.notificationThreshold)
         }
     }
 

@@ -22,6 +22,13 @@ final class SettingsWindowController: NSWindowController {
         target: nil,
         action: nil
     )
+    private let notificationsCheckbox = NSButton(
+        checkboxWithTitle: "Notify me when a window reaches",
+        target: nil,
+        action: nil
+    )
+    private let thresholdPopup = NSPopUpButton()
+    private let thresholdOptions = [70, 80, 90, 95]
     private let zenStatusLabel = NSTextField(labelWithString: "")
     private let signInButton = NSButton(title: "Sign in…", target: nil, action: nil)
     private let disconnectButton = NSButton(title: "Disconnect", target: nil, action: nil)
@@ -41,7 +48,7 @@ final class SettingsWindowController: NSWindowController {
 
     convenience init() {
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 460, height: 480),
+            contentRect: NSRect(x: 0, y: 0, width: 460, height: 560),
             styleMask: [.titled, .closable],
             backing: .buffered,
             defer: false
@@ -131,6 +138,24 @@ final class SettingsWindowController: NSWindowController {
         launchAtLoginCheckbox.action = #selector(launchAtLoginChanged)
         launchAtLoginCheckbox.translatesAutoresizingMaskIntoConstraints = false
 
+        notificationsCheckbox.target = self
+        notificationsCheckbox.action = #selector(notificationsChanged)
+        notificationsCheckbox.translatesAutoresizingMaskIntoConstraints = false
+
+        thresholdPopup.removeAllItems()
+        for value in thresholdOptions {
+            thresholdPopup.addItem(withTitle: "\(value)%")
+            thresholdPopup.lastItem?.representedObject = value
+        }
+        thresholdPopup.target = self
+        thresholdPopup.action = #selector(thresholdChanged)
+        thresholdPopup.translatesAutoresizingMaskIntoConstraints = false
+
+        let notificationsRow = NSStackView(views: [notificationsCheckbox, thresholdPopup, flexibleSpacer()])
+        notificationsRow.orientation = .horizontal
+        notificationsRow.spacing = 8
+        notificationsRow.translatesAutoresizingMaskIntoConstraints = false
+
         let closeButton = NSButton(title: "Done", target: self, action: #selector(closeTapped))
         closeButton.bezelStyle = .rounded
         closeButton.keyEquivalent = "\r"
@@ -154,6 +179,9 @@ final class SettingsWindowController: NSWindowController {
             showPercentCheckbox,
             launchAtLoginCheckbox,
             makeSeparator(),
+            makeSectionLabel("Notifications"),
+            notificationsRow,
+            makeSeparator(),
             footer,
         ])
         stack.orientation = .vertical
@@ -169,6 +197,7 @@ final class SettingsWindowController: NSWindowController {
             stack.bottomAnchor.constraint(lessThanOrEqualTo: content.bottomAnchor, constant: -20),
             keyRow.widthAnchor.constraint(equalTo: stack.widthAnchor),
             zenButtons.widthAnchor.constraint(equalTo: stack.widthAnchor),
+            notificationsRow.widthAnchor.constraint(equalTo: stack.widthAnchor),
             intervalRow.widthAnchor.constraint(equalTo: stack.widthAnchor),
             footer.widthAnchor.constraint(equalTo: stack.widthAnchor),
         ])
@@ -199,6 +228,9 @@ final class SettingsWindowController: NSWindowController {
         intervalPopup.selectItem(at: index)
         showPercentCheckbox.state = settings.showPercentInMenuBar ? .on : .off
         launchAtLoginCheckbox.state = LaunchAtLogin.isEnabled ? .on : .off
+        notificationsCheckbox.state = settings.notificationsEnabled ? .on : .off
+        thresholdPopup.isEnabled = settings.notificationsEnabled
+        thresholdPopup.selectItem(at: thresholdOptions.firstIndex(of: settings.notificationThreshold) ?? 1)
     }
 
     // MARK: - Actions
@@ -234,6 +266,17 @@ final class SettingsWindowController: NSWindowController {
             // The system refused (for example the app is not in /Applications).
             launchAtLoginCheckbox.state = LaunchAtLogin.isEnabled ? .on : .off
         }
+    }
+
+    @objc private func notificationsChanged() {
+        let enabled = notificationsCheckbox.state == .on
+        settings.notificationsEnabled = enabled
+        thresholdPopup.isEnabled = enabled
+        if enabled { NotificationManager.shared.requestAuthorization() }
+    }
+
+    @objc private func thresholdChanged() {
+        settings.notificationThreshold = thresholdPopup.selectedItem?.representedObject as? Int ?? 80
     }
 
     @objc private func signIn() {

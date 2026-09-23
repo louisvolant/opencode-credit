@@ -14,6 +14,8 @@ enum SettingsTests {
 
             checkEqual(settings.refreshIntervalMinutes, 5, "default interval is 5 minutes")
             checkEqual(settings.showPercentInMenuBar, true, "the percentage is shown by default")
+            checkEqual(settings.notificationsEnabled, false, "notifications are off by default")
+            checkEqual(settings.notificationThreshold, 80, "the default threshold is 80%")
             checkEqual(settings.cachedUsage, nil, "there is no cached usage initially")
 
             settings.refreshIntervalMinutes = 15

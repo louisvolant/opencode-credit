@@ -124,6 +124,11 @@ final class RefreshService {
                     self.settings.cachedUsage = fetched
                     self.snapshot = fetched
                     self.status = .ok
+                    NotificationManager.shared.evaluate(
+                        snapshot: fetched,
+                        enabled: self.settings.notificationsEnabled,
+                        threshold: self.settings.notificationThreshold
+                    )
                 } else if let error = outcome.usageError {
                     self.status = .failed(error)
                 }

@@ -6,6 +6,7 @@ runSuite("OpenCode Credit core tests") {
     FormattingTests.run()
     BillingParserTests.run()
     SettingsTests.run()
+    NotificationTests.run()
 }
 
 await runAsyncSuite("OpenCode Credit API tests") {
