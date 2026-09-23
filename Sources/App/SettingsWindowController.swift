@@ -17,12 +17,26 @@ final class SettingsWindowController: NSWindowController {
         target: nil,
         action: nil
     )
+    private let zenStatusLabel = NSTextField(labelWithString: "")
+    private let signInButton = NSButton(title: "Sign in…", target: nil, action: nil)
+    private let disconnectButton = NSButton(title: "Disconnect", target: nil, action: nil)
+
+    private let session = ZenSession.shared
+
+    private lazy var loginWindowController: LoginWindowController = {
+        let controller = LoginWindowController()
+        controller.onSuccess = { [weak self] in
+            self?.refreshFromSettings()
+            self?.onSave?()
+        }
+        return controller
+    }()
 
     private let intervalOptions = [1, 5, 15, 30, 60]
 
     convenience init() {
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 460, height: 320),
+            contentRect: NSRect(x: 0, y: 0, width: 460, height: 440),
             styleMask: [.titled, .closable],
             backing: .buffered,
             defer: false
@@ -70,6 +84,27 @@ final class SettingsWindowController: NSWindowController {
         sourceLabel.lineBreakMode = .byWordWrapping
         sourceLabel.translatesAutoresizingMaskIntoConstraints = false
 
+        zenStatusLabel.font = .systemFont(ofSize: 11)
+        zenStatusLabel.textColor = .secondaryLabelColor
+        zenStatusLabel.maximumNumberOfLines = 2
+        zenStatusLabel.lineBreakMode = .byWordWrapping
+        zenStatusLabel.translatesAutoresizingMaskIntoConstraints = false
+
+        signInButton.target = self
+        signInButton.action = #selector(signIn)
+        signInButton.bezelStyle = .rounded
+        signInButton.translatesAutoresizingMaskIntoConstraints = false
+
+        disconnectButton.target = self
+        disconnectButton.action = #selector(disconnect)
+        disconnectButton.bezelStyle = .rounded
+        disconnectButton.translatesAutoresizingMaskIntoConstraints = false
+
+        let zenButtons = NSStackView(views: [signInButton, disconnectButton, flexibleSpacer()])
+        zenButtons.orientation = .horizontal
+        zenButtons.spacing = 8
+        zenButtons.translatesAutoresizingMaskIntoConstraints = false
+
         intervalPopup.removeAllItems()
         for minutes in intervalOptions {
             intervalPopup.addItem(withTitle: "\(minutes) minute\(minutes == 1 ? "" : "s")")
@@ -101,6 +136,10 @@ final class SettingsWindowController: NSWindowController {
             keyRow,
             sourceLabel,
             makeSeparator(),
+            makeSectionLabel("OpenCode Zen credit"),
+            zenStatusLabel,
+            zenButtons,
+            makeSeparator(),
             makeSectionLabel("Refresh"),
             intervalRow,
             showPercentCheckbox,
@@ -119,6 +158,7 @@ final class SettingsWindowController: NSWindowController {
             stack.topAnchor.constraint(equalTo: content.topAnchor, constant: 20),
             stack.bottomAnchor.constraint(lessThanOrEqualTo: content.bottomAnchor, constant: -20),
             keyRow.widthAnchor.constraint(equalTo: stack.widthAnchor),
+            zenButtons.widthAnchor.constraint(equalTo: stack.widthAnchor),
             intervalRow.widthAnchor.constraint(equalTo: stack.widthAnchor),
             footer.widthAnchor.constraint(equalTo: stack.widthAnchor),
         ])
@@ -133,6 +173,16 @@ final class SettingsWindowController: NSWindowController {
             sourceLabel.stringValue = "Using: \(resolved.sourceDescription)"
         } else {
             sourceLabel.stringValue = "No key configured yet. Paste one above or set OPENCODE_API_KEY."
+        }
+
+        if session.isConnected {
+            zenStatusLabel.stringValue = "Connected to your OpenCode workspace."
+            disconnectButton.isEnabled = true
+        } else {
+            zenStatusLabel.stringValue =
+                "Not connected. Sign in to show your available credit "
+                + "(the Zen balance is not available through the API key)."
+            disconnectButton.isEnabled = false
         }
 
         let index = intervalOptions.firstIndex(of: settings.refreshIntervalMinutes) ?? 1
@@ -164,6 +214,16 @@ final class SettingsWindowController: NSWindowController {
 
     @objc private func showPercentChanged() {
         settings.showPercentInMenuBar = showPercentCheckbox.state == .on
+        onSave?()
+    }
+
+    @objc private func signIn() {
+        loginWindowController.show()
+    }
+
+    @objc private func disconnect() {
+        session.clear()
+        refreshFromSettings()
         onSave?()
     }
 

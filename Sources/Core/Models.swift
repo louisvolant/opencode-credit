@@ -26,8 +26,8 @@ enum ISO8601 {
 }
 
 /// A single quota window returned by the Go usage endpoint.
-struct UsageWindow: Codable, Equatable {
-    enum Status: String, Codable {
+struct UsageWindow: Codable, Equatable, Sendable {
+    enum Status: String, Codable, Sendable {
         case ok
         case limited
         case blocked
@@ -67,8 +67,16 @@ struct UsageWindow: Codable, Equatable {
     }
 }
 
+/// The OpenCode Zen available credit, read from the workspace billing page.
+struct ZenBalance: Codable, Equatable, Sendable {
+    let balanceUSD: Double
+    let monthlyLimitUSD: Double?
+    let monthlyUsageUSD: Double?
+    let fetchedAt: Date
+}
+
 /// The three Go usage windows plus the moment they were fetched.
-struct UsageSnapshot: Codable, Equatable {
+struct UsageSnapshot: Codable, Equatable, Sendable {
     let rolling: UsageWindow?
     let weekly: UsageWindow?
     let monthly: UsageWindow?

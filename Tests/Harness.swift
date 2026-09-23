@@ -37,3 +37,8 @@ func runSuite(_ name: String, _ body: () -> Void) {
     print("• \(name)")
     body()
 }
+
+func runAsyncSuite(_ name: String, _ body: () async -> Void) async {
+    print("• \(name)")
+    await body()
+}

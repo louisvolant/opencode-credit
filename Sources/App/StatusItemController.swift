@@ -51,7 +51,13 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
 
     private func render() {
         updateButton()
-        popoverController.render(snapshot: refreshService.snapshot, status: refreshService.status)
+        popoverController.render(
+            snapshot: refreshService.snapshot,
+            status: refreshService.status,
+            balance: refreshService.balance,
+            balanceError: refreshService.balanceError,
+            isConnected: ZenSession.shared.isConnected
+        )
     }
 
     private func updateButton() {

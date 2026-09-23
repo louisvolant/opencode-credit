@@ -1,0 +1,106 @@
+import Foundation
+
+enum APIClientTests {
+    static func makeSession() -> URLSession {
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [MockURLProtocol.self]
+        return URLSession(configuration: configuration)
+    }
+
+    static func run() async {
+        await runAsyncSuite("OpenCodeAPI.fetchUsage") {
+            let api = OpenCodeAPI(session: makeSession())
+            MockURLProtocol.handler = { request in
+                checkEqual(
+                    request.value(forHTTPHeaderField: "Authorization"),
+                    "Bearer sk-test",
+                    "sends the bearer token"
+                )
+                checkEqual(request.url?.path, "/zen/go/v1/usage", "calls the usage endpoint")
+                let body = #"{"usage":{"rolling":{"status":"ok","percent":55,"resetsAt":"2026-09-23T22:48:39.852Z"},"weekly":{"status":"ok","percent":28,"resetsAt":"2026-09-28T00:00:00.000Z"},"monthly":{"status":"ok","percent":15,"resetsAt":"2026-10-20T12:09:44.000Z"}}}"#
+                return (ok(request.url), Data(body.utf8))
+            }
+
+            do {
+                let snapshot = try await api.fetchUsage(apiKey: "sk-test")
+                checkEqual(snapshot.rolling?.percent, 55, "decodes rolling percent")
+                checkEqual(snapshot.monthly?.percent, 15, "decodes monthly percent")
+            } catch {
+                check(false, "unexpected error: \(error)")
+            }
+        }
+
+        await runAsyncSuite("OpenCodeAPI.fetchUsage maps HTTP errors") {
+            let api = OpenCodeAPI(session: makeSession())
+            let cases: [(Int, OpenCodeAPIError)] = [
+                (401, .unauthorized),
+                (403, .unauthorized),
+                (404, .noGoSubscription),
+                (429, .rateLimited),
+                (500, .http(status: 500)),
+            ]
+
+            for (status, expected) in cases {
+                MockURLProtocol.handler = { request in (ok(request.url, status: status), Data()) }
+                do {
+                    _ = try await api.fetchUsage(apiKey: "sk-test")
+                    check(false, "expected an error for HTTP \(status)")
+                } catch let error as OpenCodeAPIError {
+                    checkEqual(error, expected, "HTTP \(status) maps to the right error")
+                } catch {
+                    check(false, "unexpected error type for HTTP \(status): \(error)")
+                }
+            }
+        }
+
+        await runAsyncSuite("OpenCodeAPI.fetchUsage rejects an empty key") {
+            let api = OpenCodeAPI(session: makeSession())
+            MockURLProtocol.handler = { request in (ok(request.url), Data()) }
+            do {
+                _ = try await api.fetchUsage(apiKey: "")
+                check(false, "expected missingKey")
+            } catch let error as OpenCodeAPIError {
+                checkEqual(error, .missingKey, "empty key is rejected before any request")
+            } catch {
+                check(false, "unexpected error: \(error)")
+            }
+        }
+
+        await runAsyncSuite("OpenCodeAPI.fetchBalance reads the billing page") {
+            let api = OpenCodeAPI(session: makeSession())
+            MockURLProtocol.handler = { request in
+                checkEqual(request.value(forHTTPHeaderField: "Cookie"), "auth=abc", "sends the session cookie")
+                checkEqual(request.url?.path, "/workspace/wrk_test/billing", "calls the billing page")
+                let html = #"<html><script>_$HY.r["billing.get[\"wrk_test\"]"]=$R[21]=$R[2]($R[22]={p:0,s:0,f:0});$R[16]($R[22],$R[25]={balance:2200000000,monthlyLimit:20,monthlyUsage:12500000});</script></html>"#
+                return (ok(request.url), Data(html.utf8))
+            }
+
+            do {
+                let balance = try await api.fetchBalance(cookie: "auth=abc", workspaceID: "wrk_test")
+                checkEqual(balance.balanceUSD, 22.0, "reads $22.00 of credit")
+                checkEqual(balance.monthlyUsageUSD, 0.125, "reads monthly usage")
+            } catch {
+                check(false, "unexpected error: \(error)")
+            }
+        }
+
+        await runAsyncSuite("OpenCodeAPI.fetchBalance detects an expired session") {
+            let api = OpenCodeAPI(session: makeSession())
+            MockURLProtocol.handler = { request in
+                (ok(request.url), Data(#"<html><body>Continue with GitHub</body></html>"#.utf8))
+            }
+            do {
+                _ = try await api.fetchBalance(cookie: "auth=abc", workspaceID: "wrk_test")
+                check(false, "expected sessionExpired")
+            } catch let error as OpenCodeAPIError {
+                checkEqual(error, .sessionExpired, "detects the sign-in page served with HTTP 200")
+            } catch {
+                check(false, "unexpected error: \(error)")
+            }
+        }
+    }
+
+    private static func ok(_ url: URL?, status: Int = 200) -> HTTPURLResponse {
+        HTTPURLResponse(url: url ?? URL(string: "https://opencode.ai")!, statusCode: status, httpVersion: nil, headerFields: nil)!
+    }
+}

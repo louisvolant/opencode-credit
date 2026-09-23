@@ -1,11 +1,14 @@
 import Foundation
 
 /// Errors surfaced by the OpenCode API client. Messages are user facing.
-enum OpenCodeAPIError: LocalizedError, Equatable {
+enum OpenCodeAPIError: LocalizedError, Equatable, Sendable {
     case missingKey
     case unauthorized
     case noGoSubscription
     case rateLimited
+    case missingSession
+    case sessionExpired
+    case balanceUnavailable
     case http(status: Int)
     case decoding(String)
     case network(String)
@@ -20,6 +23,12 @@ enum OpenCodeAPIError: LocalizedError, Equatable {
             return "No OpenCode Go subscription found for this key."
         case .rateLimited:
             return "Too many requests. Try again in a moment."
+        case .missingSession:
+            return "Sign in to OpenCode to see your credit balance."
+        case .sessionExpired:
+            return "Your OpenCode session expired. Sign in again."
+        case .balanceUnavailable:
+            return "Could not read the credit balance from the billing page."
         case .http(let status):
             return "The server returned HTTP \(status)."
         case .decoding(let detail):
@@ -36,6 +45,9 @@ final class OpenCodeAPI {
 
     private let session: URLSession
     private let usageURL = URL(string: "https://opencode.ai/zen/go/v1/usage")!
+    private let userAgent =
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 "
+        + "(KHTML, like Gecko) Version/17.0 Safari/605.1.15"
 
     init(session: URLSession = .shared) {
         self.session = session
@@ -52,19 +64,9 @@ final class OpenCodeAPI {
         request.setValue("OpenCodeCredit/1.0", forHTTPHeaderField: "User-Agent")
         request.timeoutInterval = 20
 
-        let data: Data
-        let response: URLResponse
-        do {
-            (data, response) = try await session.data(for: request)
-        } catch {
-            throw OpenCodeAPIError.network(error.localizedDescription)
-        }
+        let (data, response) = try await perform(request)
 
-        guard let http = response as? HTTPURLResponse else {
-            throw OpenCodeAPIError.network("Unexpected response")
-        }
-
-        switch http.statusCode {
+        switch response.statusCode {
         case 200:
             break
         case 401, 403:
@@ -75,13 +77,69 @@ final class OpenCodeAPI {
         case 429:
             throw OpenCodeAPIError.rateLimited
         default:
-            throw OpenCodeAPIError.http(status: http.statusCode)
+            throw OpenCodeAPIError.http(status: response.statusCode)
         }
 
         do {
             return try UsageSnapshot.decode(from: data)
         } catch {
             throw OpenCodeAPIError.decoding(error.localizedDescription)
+        }
+    }
+
+    /// Reads the Zen credit balance from the workspace billing page. This is
+    /// not an official API: it relies on the browser session captured by the
+    /// embedded login.
+    func fetchBalance(cookie: String, workspaceID: String) async throws -> ZenBalance {
+        guard !cookie.isEmpty, !workspaceID.isEmpty else { throw OpenCodeAPIError.missingSession }
+        guard let url = URL(string: "https://opencode.ai/workspace/\(workspaceID)/billing") else {
+            throw OpenCodeAPIError.balanceUnavailable
+        }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.setValue(cookie, forHTTPHeaderField: "Cookie")
+        request.setValue("text/html", forHTTPHeaderField: "Accept")
+        request.setValue(userAgent, forHTTPHeaderField: "User-Agent")
+        request.timeoutInterval = 20
+
+        let (data, response) = try await perform(request)
+
+        switch response.statusCode {
+        case 200:
+            break
+        case 401, 403:
+            throw OpenCodeAPIError.sessionExpired
+        default:
+            throw OpenCodeAPIError.http(status: response.statusCode)
+        }
+
+        guard let html = String(data: data, encoding: .utf8) else {
+            throw OpenCodeAPIError.balanceUnavailable
+        }
+
+        // An expired session serves the sign-in page with a 200 status.
+        if html.contains("Continue with GitHub") || html.contains("OpenAuth") {
+            throw OpenCodeAPIError.sessionExpired
+        }
+
+        guard let balance = BillingParser.parse(html: html) else {
+            throw OpenCodeAPIError.balanceUnavailable
+        }
+        return balance
+    }
+
+    private func perform(_ request: URLRequest) async throws -> (Data, HTTPURLResponse) {
+        do {
+            let (data, response) = try await session.data(for: request)
+            guard let http = response as? HTTPURLResponse else {
+                throw OpenCodeAPIError.network("Unexpected response")
+            }
+            return (data, http)
+        } catch let error as OpenCodeAPIError {
+            throw error
+        } catch {
+            throw OpenCodeAPIError.network(error.localizedDescription)
         }
     }
 }

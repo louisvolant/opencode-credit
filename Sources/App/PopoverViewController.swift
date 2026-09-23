@@ -12,6 +12,7 @@ final class PopoverViewController: NSViewController {
     private let monthlyRow = UsageRowView(title: "Monthly usage")
     private let zenTitleLabel = NSTextField(labelWithString: "OpenCode Zen")
     private let balanceLabel = NSTextField(labelWithString: "Not connected")
+    private let balanceDetailLabel = NSTextField(labelWithString: "")
     private let statusLabel = NSTextField(labelWithString: "")
     private let updatedLabel = NSTextField(labelWithString: "Never updated")
 
@@ -34,6 +35,11 @@ final class PopoverViewController: NSViewController {
 
         balanceLabel.font = .monospacedDigitSystemFont(ofSize: 20, weight: .semibold)
         balanceLabel.textColor = .labelColor
+
+        balanceDetailLabel.font = .systemFont(ofSize: 11)
+        balanceDetailLabel.textColor = .secondaryLabelColor
+        balanceDetailLabel.maximumNumberOfLines = 3
+        balanceDetailLabel.lineBreakMode = .byWordWrapping
 
         statusLabel.font = .systemFont(ofSize: 11)
         statusLabel.textColor = .secondaryLabelColor
@@ -63,6 +69,7 @@ final class PopoverViewController: NSViewController {
             separator(),
             zenTitleLabel,
             balanceLabel,
+            balanceDetailLabel,
             statusLabel,
             separator(),
             footer,
@@ -88,7 +95,13 @@ final class PopoverViewController: NSViewController {
 
     // MARK: - Rendering
 
-    func render(snapshot: UsageSnapshot?, status: RefreshService.Status) {
+    func render(
+        snapshot: UsageSnapshot?,
+        status: RefreshService.Status,
+        balance: ZenBalance?,
+        balanceError: String?,
+        isConnected: Bool
+    ) {
         let now = Date()
 
         rollingRow.update(percent: snapshot?.rolling?.percent, resetsAt: snapshot?.rolling?.resetsAt, now: now)
@@ -116,13 +129,36 @@ final class PopoverViewController: NSViewController {
             statusLabel.isHidden = true
         }
 
+        renderBalance(balance, error: balanceError, isConnected: isConnected)
+
         view.layoutSubtreeIfNeeded()
         preferredContentSize = NSSize(width: contentWidth, height: view.fittingSize.height)
     }
 
-    /// Placeholder until the Zen credit integration lands.
-    func renderBalance(_ text: String) {
-        balanceLabel.stringValue = text
+    private func renderBalance(_ balance: ZenBalance?, error: String?, isConnected: Bool) {
+        if let balance {
+            balanceLabel.stringValue = Formatting.currency(balance.balanceUSD)
+            balanceLabel.textColor = .labelColor
+
+            if let usage = balance.monthlyUsageUSD, let limit = balance.monthlyLimitUSD {
+                balanceDetailLabel.stringValue =
+                    "Used \(Formatting.currency(usage)) of \(Formatting.currency(limit)) this month"
+            } else if let usage = balance.monthlyUsageUSD {
+                balanceDetailLabel.stringValue = "Used \(Formatting.currency(usage)) this month"
+            } else {
+                balanceDetailLabel.stringValue = ""
+            }
+        } else if isConnected {
+            balanceLabel.stringValue = "—"
+            balanceLabel.textColor = .secondaryLabelColor
+            balanceDetailLabel.stringValue = error ?? "Reading the billing page…"
+        } else {
+            balanceLabel.stringValue = "Not connected"
+            balanceLabel.textColor = .secondaryLabelColor
+            balanceDetailLabel.stringValue = "Sign in from Settings to show your credit."
+        }
+
+        balanceDetailLabel.isHidden = balanceDetailLabel.stringValue.isEmpty
     }
 
     // MARK: - Actions

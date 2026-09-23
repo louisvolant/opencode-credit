@@ -1,6 +1,7 @@
 import Foundation
 
-/// Fetches usage on a timer and keeps the last successful snapshot around.
+/// Fetches usage (and the Zen balance when connected) on a timer, and keeps
+/// the last successful values around.
 final class RefreshService {
     enum Status: Equatable {
         case idle
@@ -10,16 +11,30 @@ final class RefreshService {
         case needsSetup
     }
 
-    /// Last successful snapshot, if any.
+    /// Immutable result of one refresh pass, safe to hand to the main actor.
+    private struct Outcome: Sendable {
+        let usage: UsageSnapshot?
+        let usageError: String?
+        let balance: ZenBalance?
+        let balanceError: String?
+        let sessionExpired: Bool
+    }
+
+    /// Last successful Go usage snapshot, if any.
     private(set) var snapshot: UsageSnapshot?
-    /// Current fetch status.
+    /// Last successful Zen balance, if any.
+    private(set) var balance: ZenBalance?
+    /// Last balance error, if any.
+    private(set) var balanceError: String?
+    /// Current fetch status for the Go usage.
     private(set) var status: Status = .idle
 
-    /// Called on the main thread whenever `snapshot` or `status` changes.
+    /// Called on the main thread whenever something changes.
     var onUpdate: (() -> Void)?
 
     private let api: OpenCodeAPI
     private let credentials: CredentialStore
+    private let zenSession: ZenSession
     private let settings: Settings
     private var timer: Timer?
     private var isRefreshing = false
@@ -27,10 +42,12 @@ final class RefreshService {
     init(
         api: OpenCodeAPI = .shared,
         credentials: CredentialStore = .shared,
+        zenSession: ZenSession = .shared,
         settings: Settings = .shared
     ) {
         self.api = api
         self.credentials = credentials
+        self.zenSession = zenSession
         self.settings = settings
     }
 
@@ -59,24 +76,72 @@ final class RefreshService {
         status = .loading
         onUpdate?()
 
+        let session = zenSession.credentials
+
         Task { [weak self] in
             guard let self else { return }
+
+            var usage: UsageSnapshot?
+            var usageError: String?
+            var balance: ZenBalance?
+            var balanceError: String?
+            var sessionExpired = false
+
             do {
-                let fetched = try await self.api.fetchUsage(apiKey: resolved.key)
-                await MainActor.run {
+                usage = try await self.api.fetchUsage(apiKey: resolved.key)
+            } catch {
+                usageError = Self.message(for: error)
+            }
+
+            if let session {
+                do {
+                    balance = try await self.api.fetchBalance(
+                        cookie: session.cookie,
+                        workspaceID: session.workspaceID
+                    )
+                } catch {
+                    balanceError = Self.message(for: error)
+                    if let apiError = error as? OpenCodeAPIError, apiError == .sessionExpired {
+                        sessionExpired = true
+                    }
+                }
+            }
+
+            // Freeze the outcome so the main-actor closure only captures
+            // immutable values.
+            let outcome = Outcome(
+                usage: usage,
+                usageError: usageError,
+                balance: balance,
+                balanceError: balanceError,
+                sessionExpired: sessionExpired
+            )
+
+            await MainActor.run {
+                self.isRefreshing = false
+
+                if let fetched = outcome.usage {
                     self.settings.cachedUsage = fetched
                     self.snapshot = fetched
                     self.status = .ok
-                    self.isRefreshing = false
-                    self.onUpdate?()
+                } else if let error = outcome.usageError {
+                    self.status = .failed(error)
                 }
-            } catch {
-                let message = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
-                await MainActor.run {
-                    self.isRefreshing = false
-                    self.status = .failed(message)
-                    self.onUpdate?()
+
+                if let fetched = outcome.balance {
+                    self.balance = fetched
+                    self.balanceError = nil
+                } else if let error = outcome.balanceError {
+                    self.balanceError = error
                 }
+
+                if outcome.sessionExpired {
+                    self.zenSession.clear()
+                    self.balance = nil
+                    self.balanceError = OpenCodeAPIError.sessionExpired.errorDescription
+                }
+
+                self.onUpdate?()
             }
         }
     }
@@ -95,5 +160,9 @@ final class RefreshService {
         // .common keeps the timer firing while menus and popovers are tracking.
         RunLoop.main.add(timer, forMode: .common)
         self.timer = timer
+    }
+
+    private static func message(for error: Error) -> String {
+        (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
     }
 }
