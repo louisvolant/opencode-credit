@@ -1,0 +1,20 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    # macOS 14 runners are Apple Silicon, which matches the supported hardware.
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run unit tests
+        run: ./scripts/run-tests.sh
+
+      - name: Build the app
+        run: ./build.sh
