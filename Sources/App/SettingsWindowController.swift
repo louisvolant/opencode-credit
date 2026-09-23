@@ -17,6 +17,11 @@ final class SettingsWindowController: NSWindowController {
         target: nil,
         action: nil
     )
+    private let launchAtLoginCheckbox = NSButton(
+        checkboxWithTitle: "Launch at login",
+        target: nil,
+        action: nil
+    )
     private let zenStatusLabel = NSTextField(labelWithString: "")
     private let signInButton = NSButton(title: "Sign in…", target: nil, action: nil)
     private let disconnectButton = NSButton(title: "Disconnect", target: nil, action: nil)
@@ -36,7 +41,7 @@ final class SettingsWindowController: NSWindowController {
 
     convenience init() {
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 460, height: 440),
+            contentRect: NSRect(x: 0, y: 0, width: 460, height: 480),
             styleMask: [.titled, .closable],
             backing: .buffered,
             defer: false
@@ -122,6 +127,10 @@ final class SettingsWindowController: NSWindowController {
         showPercentCheckbox.action = #selector(showPercentChanged)
         showPercentCheckbox.translatesAutoresizingMaskIntoConstraints = false
 
+        launchAtLoginCheckbox.target = self
+        launchAtLoginCheckbox.action = #selector(launchAtLoginChanged)
+        launchAtLoginCheckbox.translatesAutoresizingMaskIntoConstraints = false
+
         let closeButton = NSButton(title: "Done", target: self, action: #selector(closeTapped))
         closeButton.bezelStyle = .rounded
         closeButton.keyEquivalent = "\r"
@@ -143,6 +152,7 @@ final class SettingsWindowController: NSWindowController {
             makeSectionLabel("Refresh"),
             intervalRow,
             showPercentCheckbox,
+            launchAtLoginCheckbox,
             makeSeparator(),
             footer,
         ])
@@ -188,6 +198,7 @@ final class SettingsWindowController: NSWindowController {
         let index = intervalOptions.firstIndex(of: settings.refreshIntervalMinutes) ?? 1
         intervalPopup.selectItem(at: index)
         showPercentCheckbox.state = settings.showPercentInMenuBar ? .on : .off
+        launchAtLoginCheckbox.state = LaunchAtLogin.isEnabled ? .on : .off
     }
 
     // MARK: - Actions
@@ -215,6 +226,14 @@ final class SettingsWindowController: NSWindowController {
     @objc private func showPercentChanged() {
         settings.showPercentInMenuBar = showPercentCheckbox.state == .on
         onSave?()
+    }
+
+    @objc private func launchAtLoginChanged() {
+        let enabled = launchAtLoginCheckbox.state == .on
+        if !LaunchAtLogin.setEnabled(enabled) {
+            // The system refused (for example the app is not in /Applications).
+            launchAtLoginCheckbox.state = LaunchAtLogin.isEnabled ? .on : .off
+        }
     }
 
     @objc private func signIn() {
