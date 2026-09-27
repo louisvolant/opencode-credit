@@ -46,7 +46,7 @@ final class LoginWindowController: NSWindowController, WKNavigationDelegate {
         window.contentView = content
 
         instructionsLabel.stringValue =
-            "Continue with GitHub, then open your workspace console (Go or Billing page). "
+            "Sign in with GitHub or Google, then open your workspace console (Go or Billing page). "
             + "This window closes automatically once your workspace is detected."
         instructionsLabel.font = .systemFont(ofSize: 11)
         instructionsLabel.textColor = .secondaryLabelColor
@@ -65,6 +65,12 @@ final class LoginWindowController: NSWindowController, WKNavigationDelegate {
         topBar.translatesAutoresizingMaskIntoConstraints = false
 
         webView = WKWebView(frame: .zero, configuration: WKWebViewConfiguration())
+        // Google refuses OAuth inside embedded web views ("disallowed_useragent")
+        // unless the user agent looks like a full desktop browser. WKWebView's
+        // default UA omits the `Safari/...` token, so we impersonate Safari.
+        webView.customUserAgent =
+            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 "
+            + "(KHTML, like Gecko) Version/17.0 Safari/605.1.15"
         webView.navigationDelegate = self
         webView.translatesAutoresizingMaskIntoConstraints = false
 

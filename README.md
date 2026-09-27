@@ -124,7 +124,7 @@ The credit balance is **not** available through the API key. To show it, the
 app opens an embedded login window:
 
 1. In Settings, click **Sign in…** under "OpenCode Zen credit".
-2. Continue with **GitHub** (Google blocks OAuth inside embedded web views).
+2. Sign in with **GitHub** or **Google**.
 3. The window detects your workspace automatically and closes.
 
 The app stores the resulting session (cookie + workspace id) in the Keychain
