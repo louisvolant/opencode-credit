@@ -33,18 +33,35 @@ Command Line Tools.
 
 ## Install
 
-### Option 1 — Download the app (no toolchain required)
+### Option 1 — Homebrew (recommended)
+
+```sh
+brew install --cask louisvolant/opencode-statusbar/opencode-credit
+```
+
+Homebrew resolves the tap automatically, so no separate `brew tap` is needed.
+The app is **not notarised** by Apple, so macOS blocks the first launch:
+**right-click the app → Open**, or run:
+
+```sh
+xattr -dr com.apple.quarantine "/Applications/OpenCode Credit.app"
+```
+
+The cask is published from the
+[`louisvolant/homebrew-opencode-statusbar`](https://github.com/louisvolant/homebrew-opencode-statusbar)
+tap and updated automatically from each release.
+
+### Option 2 — Download the app (no toolchain required)
 
 1. Download the latest `OpenCodeCredit-<version>.zip` from the
    [Releases](https://github.com/louisvolant/opencode-credit/releases) page.
 2. Unzip it and drag `OpenCode Credit.app` into `/Applications`.
-3. The app is not notarised, so macOS warns you the first time. Either
-   **right-click the app → Open**, or run:
+3. **Right-click the app → Open** (it is not notarised), or run:
    ```sh
    xattr -dr com.apple.quarantine "/Applications/OpenCode Credit.app"
    ```
 
-### Option 2 — Build from source
+### Option 3 — Build from source
 
 ```sh
 git clone git@github.com:louisvolant/opencode-credit.git
@@ -54,16 +71,6 @@ make run
 
 `make build` produces `build/OpenCode Credit.app`, `make test` runs the unit
 tests, and `make release` produces a zip in `dist/`.
-
-### Option 3 — Homebrew
-
-```sh
-brew tap louisvolant/opencode https://github.com/louisvolant/opencode-credit
-brew install --cask louisvolant/opencode/opencode-credit
-```
-
-The cask's `sha256` must be updated for each release; `make release` prints the
-value to paste into `Casks/opencode-credit.rb`.
 
 ## Configuration
 
@@ -146,8 +153,11 @@ Sources/Core   # platform-independent logic (parsing, config, API, storage)
 Sources/App    # AppKit / WebKit user interface
 Tests          # unit tests, including mocked API calls
 scripts        # test and packaging helpers
-Casks          # Homebrew cask
 ```
+
+The Homebrew cask lives in a dedicated tap repository,
+[`louisvolant/homebrew-opencode-statusbar`](https://github.com/louisvolant/homebrew-opencode-statusbar),
+which bumps itself from each GitHub release.
 
 The project deliberately has no Xcode project and no third-party dependencies:
 everything is compiled with a single `swiftc` call from `build.sh`. The unit

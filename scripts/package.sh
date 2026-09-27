@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 #
 # Builds the app and produces a distributable zip in dist/.
-# Also prints the SHA-256 needed to update the Homebrew cask.
+# Also prints the SHA-256 of the zip (the Homebrew tap recomputes it
+# automatically from the release).
 
 set -euo pipefail
 
