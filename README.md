@@ -132,7 +132,9 @@ the app asks you to sign in again.
 
 - **Go usage** uses the official API-key endpoint:
   `GET https://opencode.ai/zen/go/v1/usage` with an `Authorization: Bearer`
-  header. This is stable.
+  header. This is stable. Note that the endpoint returns **integer**
+  percentages (floored) that can lag the web console by up to one point — e.g.
+  the app may show 79% while the console shows 80%.
 - **Zen credit** is not exposed by the API (`/zen/v1/balance` returns 404), so
   the app reads your workspace billing page with the captured browser session.
   This part is **best effort**: it may break if OpenCode changes its console,
@@ -151,6 +153,10 @@ the app asks you to sign in again.
   Settings. "The API key was rejected" means the key is invalid.
 - **"No OpenCode Go subscription found for this key."** The usage endpoint only
   exists for accounts with a Go subscription.
+- **The percentage is one point lower than the web console.** The official
+  usage endpoint returns floored integers and can lag the console; the app
+  shows exactly what the API returns. This is not a refresh or caching issue —
+  the tooltip on the menu bar icon shows the last successful refresh time.
 - **The balance says "Not connected".** Sign in from Settings.
 - **The balance shows "—" or an error.** The billing page format changed. The
   rest of the app is unaffected; please open an issue.

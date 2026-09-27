@@ -63,6 +63,8 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
     private func updateButton() {
         guard let button = statusItem.button else { return }
 
+        button.toolTip = tooltip()
+
         guard
             settings.showPercentInMenuBar,
             let snapshot = refreshService.snapshot,
@@ -80,6 +82,24 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
                 .font: NSFont.monospacedDigitSystemFont(ofSize: 12, weight: .medium),
             ]
         )
+    }
+
+    /// Tooltip for the menu bar icon: last refresh time, or the current issue.
+    private func tooltip() -> String {
+        switch refreshService.status {
+        case .failed(let message):
+            return "OpenCode Credit — \(message)"
+        case .needsSetup:
+            return "OpenCode Credit — no API key configured"
+        default:
+            guard
+                let fetchedAt = refreshService.snapshot?.fetchedAt,
+                fetchedAt != .distantPast
+            else {
+                return "OpenCode Credit"
+            }
+            return "OpenCode Credit — updated \(Formatting.relative(fetchedAt))"
+        }
     }
 
     // MARK: - Interaction
