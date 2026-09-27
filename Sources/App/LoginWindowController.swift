@@ -12,6 +12,7 @@ final class LoginWindowController: NSWindowController, WKNavigationDelegate {
 
     private let session = ZenSession.shared
     private let instructionsLabel = NSTextField(labelWithString: "")
+    private let statusLabel = NSTextField(labelWithString: "")
     private var webView: WKWebView!
     private var didFinish = false
 
@@ -30,6 +31,7 @@ final class LoginWindowController: NSWindowController, WKNavigationDelegate {
 
     func show() {
         didFinish = false
+        setStatus("Waiting for sign-in…")
         load()
         NSApp.activate(ignoringOtherApps: true)
         window?.center()
@@ -54,11 +56,23 @@ final class LoginWindowController: NSWindowController, WKNavigationDelegate {
         instructionsLabel.lineBreakMode = .byWordWrapping
         instructionsLabel.translatesAutoresizingMaskIntoConstraints = false
 
+        statusLabel.font = .systemFont(ofSize: 11)
+        statusLabel.textColor = .tertiaryLabelColor
+        statusLabel.maximumNumberOfLines = 2
+        statusLabel.lineBreakMode = .byTruncatingMiddle
+        statusLabel.translatesAutoresizingMaskIntoConstraints = false
+
         let doneButton = NSButton(title: "Done", target: self, action: #selector(doneTapped))
         doneButton.bezelStyle = .rounded
         doneButton.translatesAutoresizingMaskIntoConstraints = false
 
-        let topBar = NSStackView(views: [instructionsLabel, doneButton])
+        let infoStack = NSStackView(views: [instructionsLabel, statusLabel])
+        infoStack.orientation = .vertical
+        infoStack.alignment = .leading
+        infoStack.spacing = 2
+        infoStack.translatesAutoresizingMaskIntoConstraints = false
+
+        let topBar = NSStackView(views: [infoStack, doneButton])
         topBar.orientation = .horizontal
         topBar.alignment = .centerY
         topBar.spacing = 12
@@ -98,8 +112,12 @@ final class LoginWindowController: NSWindowController, WKNavigationDelegate {
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
         guard !didFinish else { return }
         detectWorkspace { [weak self] workspaceID in
-            guard let self, let workspaceID else { return }
-            self.finish(with: workspaceID)
+            guard let self else { return }
+            if let workspaceID {
+                self.finish(with: workspaceID)
+            } else {
+                self.setStatus("No workspace id on this page — open your console (Go or Billing) page.")
+            }
         }
     }
 
@@ -116,6 +134,8 @@ final class LoginWindowController: NSWindowController, WKNavigationDelegate {
 
     // MARK: - Workspace detection
 
+    /// Tries the current URL first, then scans the rendered HTML: the console is
+    /// a single-page app, so the workspace id often only exists in its links.
     private func detectWorkspace(completion: @escaping (String?) -> Void) {
         if let id = WorkspaceURL.id(from: webView.url?.absoluteString) {
             completion(id)
@@ -124,14 +144,9 @@ final class LoginWindowController: NSWindowController, WKNavigationDelegate {
 
         let script = """
         (function() {
-          var links = document.querySelectorAll('a[href*="/console/"], a[href*="/workspace/"]');
-          for (var i = 0; i < links.length; i++) {
-            var href = links[i].getAttribute('href') || '';
-            if (href.indexOf('/console/') !== -1 || href.indexOf('/workspace/') !== -1) {
-              return href;
-            }
-          }
-          return null;
+          var href = location.href || '';
+          var html = document.documentElement ? document.documentElement.outerHTML : '';
+          return href + "\\n" + html;
         })();
         """
         webView.evaluateJavaScript(script) { result, _ in
@@ -150,6 +165,7 @@ final class LoginWindowController: NSWindowController, WKNavigationDelegate {
             guard !relevant.isEmpty else {
                 DispatchQueue.main.async {
                     self.didFinish = false
+                    self.setStatus("Workspace \(workspaceID) found, but no opencode.ai cookie yet — reload the page, then Done.")
                     self.showDetectionFailure()
                 }
                 return
@@ -158,16 +174,24 @@ final class LoginWindowController: NSWindowController, WKNavigationDelegate {
             let header = relevant.map { "\($0.name)=\($0.value)" }.joined(separator: "; ")
             DispatchQueue.main.async {
                 self.session.save(cookie: header, workspaceID: workspaceID)
+                self.setStatus("Connected: \(workspaceID) (\(relevant.count) cookies).")
                 self.onSuccess?()
                 self.close()
             }
         }
     }
 
+    private func setStatus(_ text: String) {
+        statusLabel.stringValue = text
+    }
+
     private func showDetectionFailure() {
+        let path = webView.url?.path ?? "?"
         let alert = NSAlert()
         alert.messageText = "Workspace not detected"
-        alert.informativeText = "Open your workspace billing page in the window, then click Done again."
+        alert.informativeText =
+            "Open your workspace console (Go or Billing page) in the window, then click Done again.\n\n"
+            + "Current page: \(path)"
         alert.alertStyle = .warning
         alert.runModal()
     }
