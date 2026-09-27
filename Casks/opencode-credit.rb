@@ -1,7 +1,6 @@
 cask "opencode-credit" do
   version "1.0.0"
-  # Update this with the value printed by `make release`.
-  sha256 "REPLACE_WITH_SHA256_OF_THE_RELEASE_ZIP"
+  sha256 "66e444dc3cf719f67fc253a2a34d95fc0f623e02c9309a3c549bc00f34d9fd17"
 
   url "https://github.com/louisvolant/opencode-credit/releases/download/v#{version}/OpenCodeCredit-#{version}.zip"
   name "OpenCode Credit"
