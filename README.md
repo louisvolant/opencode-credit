@@ -50,10 +50,12 @@ xattr -dr com.apple.quarantine "/Applications/OpenCode Credit.app"
 
 Prefer to avoid the Gatekeeper prompt altogether? Install the build-from-source
 formula instead: it compiles the app locally, so it is **not quarantined** (it
-needs the Command Line Tools).
+needs the Command Line Tools). Homebrew 7 requires trusting third-party tap
+formulae first:
 
 ```sh
-brew install --formula louisvolant/opencode-statusbar/opencode-credit
+brew trust --formula louisvolant/opencode-statusbar/opencode-credit-src
+brew install --formula louisvolant/opencode-statusbar/opencode-credit-src
 ```
 
 The cask and formula are published from the
@@ -83,7 +85,7 @@ make run
 tests, and `make release` produces a zip in `dist/`.
 
 You can also let Homebrew do the build for you with the formula above
-(`brew install --formula …`).
+(`brew install --formula louisvolant/opencode-statusbar/opencode-credit-src`).
 
 ## Configuration
 
