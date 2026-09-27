@@ -72,6 +72,63 @@ enum ConfigTests {
             )
         }
 
+        runSuite("v2 opencode.json key resolution") {
+            let home = makeTempHome()
+            defer { cleanup(home) }
+
+            let configURL = home.appendingPathComponent(".config/opencode/opencode.json")
+            write(
+                #"{"providers":{"opencode-go":{"type":"opencode-go","apiKey":"oc_sk_v2"}}}"#,
+                to: configURL
+            )
+
+            let resolved = OpenCodeConfig.keyFromConfigFile(homeDirectory: home, environment: [:])
+            checkEqual(resolved?.key, "oc_sk_v2", "reads providers.opencode-go.apiKey")
+            checkEqual(resolved?.source, .configFile(path: configURL.path), "reports the config file path")
+        }
+
+        runSuite("v2 config matched by provider type") {
+            let home = makeTempHome()
+            defer { cleanup(home) }
+
+            write(
+                #"{"providers":{"custom":{"type":"opencode-go","apiKey":"oc_sk_type"}}}"#,
+                to: home.appendingPathComponent(".config/opencode/opencode.json")
+            )
+
+            let resolved = OpenCodeConfig.keyFromConfigFile(homeDirectory: home, environment: [:])
+            checkEqual(resolved?.key, "oc_sk_type", "matches an entry by its type field")
+        }
+
+        runSuite("config value substitution") {
+            let home = makeTempHome()
+            defer { cleanup(home) }
+
+            let configURL = home.appendingPathComponent(".config/opencode/opencode.json")
+            write(
+                #"{"providers":{"opencode-go":{"apiKey":"{env:OPENCODE_GO}"}}}"#,
+                to: configURL
+            )
+
+            let resolved = OpenCodeConfig.keyFromConfigFile(
+                homeDirectory: home,
+                environment: ["OPENCODE_GO": "oc_sk_env"]
+            )
+            checkEqual(resolved?.key, "oc_sk_env", "resolves {env:NAME}")
+
+            let unresolved = OpenCodeConfig.keyFromConfigFile(homeDirectory: home, environment: [:])
+            checkEqual(unresolved, nil, "an unset {env:NAME} yields no key")
+
+            // {file:path} is resolved relative to the config directory.
+            write("oc_sk_file\n", to: home.appendingPathComponent(".config/opencode/.opencode-key"))
+            write(
+                #"{"providers":{"opencode-go":{"apiKey":"{file:.opencode-key}"}}}"#,
+                to: configURL
+            )
+            let fromFile = OpenCodeConfig.keyFromConfigFile(homeDirectory: home, environment: [:])
+            checkEqual(fromFile?.key, "oc_sk_file", "resolves {file:path} and trims whitespace")
+        }
+
         runSuite("CredentialStore priority") {
             let home = makeTempHome()
             defer { cleanup(home) }

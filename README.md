@@ -80,10 +80,17 @@ order and uses the first match:
    variable. Note that an app launched from Finder does not inherit your shell
    environment, so this mostly helps when launching from a terminal.
 3. Your existing OpenCode configuration, if present:
-   - `~/.config/opencode/opencode.json` →
-     `provider.zen.options.apiKey` (or `provider["opencode-go"]`),
+   - `~/.config/opencode/opencode.json`:
+     - v2 shape: `providers.<id>.apiKey` (or an entry whose `type` is a known
+       provider id such as `opencode-go`),
+     - v1 shape: `provider.<id>.options.apiKey`,
    - `$XDG_DATA_HOME/opencode/auth.json` or
      `~/.local/share/opencode/auth.json` (legacy format).
+
+Values may use OpenCode's variable substitution and are resolved by the app
+too: `{env:NAME}` reads an environment variable and `{file:path}` reads a file
+(relative to the config directory, or an absolute/`~` path). This lets you keep
+the key out of `opencode.json`.
 
 If nothing is found, paste a key in Settings. The settings window shows which
 source is currently in use.
