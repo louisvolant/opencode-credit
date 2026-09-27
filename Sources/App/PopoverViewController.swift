@@ -15,6 +15,7 @@ final class PopoverViewController: NSViewController {
     private let balanceDetailLabel = NSTextField(labelWithString: "")
     private let statusLabel = NSTextField(labelWithString: "")
     private let updatedLabel = NSTextField(labelWithString: "Never updated")
+    private let versionLabel = NSTextField(labelWithString: "")
 
     private let contentWidth: CGFloat = 300
 
@@ -49,9 +50,18 @@ final class PopoverViewController: NSViewController {
         updatedLabel.font = .systemFont(ofSize: 11)
         updatedLabel.textColor = .tertiaryLabelColor
 
+        versionLabel.font = .systemFont(ofSize: 11)
+        versionLabel.textColor = .tertiaryLabelColor
+        if let version = AppInfo.version {
+            versionLabel.stringValue = "v\(version)"
+        } else {
+            versionLabel.isHidden = true
+        }
+
         let footer = NSStackView(views: [
             updatedLabel,
             flexibleSpacer(),
+            versionLabel,
             iconButton(symbol: "arrow.clockwise", tooltip: "Refresh now", action: #selector(refreshTapped)),
             iconButton(symbol: "gearshape", tooltip: "Settings", action: #selector(settingsTapped)),
             iconButton(symbol: "power", tooltip: "Quit", action: #selector(quitTapped)),
