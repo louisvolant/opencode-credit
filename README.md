@@ -40,14 +40,23 @@ brew install --cask louisvolant/opencode-statusbar/opencode-credit
 ```
 
 Homebrew resolves the tap automatically, so no separate `brew tap` is needed.
-The app is **not notarised** by Apple, so macOS blocks the first launch:
-**right-click the app → Open**, or run:
+The app is **not notarised** by Apple, so macOS blocks the first launch. On
+macOS 15 and later the right-click shortcut is not always enough: open
+**System Settings → Privacy & Security** and click **"Open Anyway"**, or run:
 
 ```sh
 xattr -dr com.apple.quarantine "/Applications/OpenCode Credit.app"
 ```
 
-The cask is published from the
+Prefer to avoid the Gatekeeper prompt altogether? Install the build-from-source
+formula instead: it compiles the app locally, so it is **not quarantined** (it
+needs the Command Line Tools).
+
+```sh
+brew install --formula louisvolant/opencode-statusbar/opencode-credit
+```
+
+The cask and formula are published from the
 [`louisvolant/homebrew-opencode-statusbar`](https://github.com/louisvolant/homebrew-opencode-statusbar)
 tap and updated automatically from each release.
 
@@ -56,7 +65,8 @@ tap and updated automatically from each release.
 1. Download the latest `OpenCodeCredit-<version>.zip` from the
    [Releases](https://github.com/louisvolant/opencode-credit/releases) page.
 2. Unzip it and drag `OpenCode Credit.app` into `/Applications`.
-3. **Right-click the app → Open** (it is not notarised), or run:
+3. Open **System Settings → Privacy & Security** and click **"Open Anyway"**
+   (or right-click the app → Open), or run:
    ```sh
    xattr -dr com.apple.quarantine "/Applications/OpenCode Credit.app"
    ```
@@ -71,6 +81,9 @@ make run
 
 `make build` produces `build/OpenCode Credit.app`, `make test` runs the unit
 tests, and `make release` produces a zip in `dist/`.
+
+You can also let Homebrew do the build for you with the formula above
+(`brew install --formula …`).
 
 ## Configuration
 
