@@ -21,13 +21,24 @@ enum BillingParser {
     }
 
     static func parse(html: String, fetchedAt: Date = Date()) -> ZenBalance? {
-        guard let data = parseBillingData(html: html) else { return nil }
-        return ZenBalance(
-            balanceUSD: data.balanceUSD,
-            monthlyLimitUSD: data.monthlyLimitUSD,
-            monthlyUsageUSD: data.monthlyUsageUSD,
-            fetchedAt: fetchedAt
-        )
+        let useCredit = parseUseCredit(html: html)
+
+        if let data = parseBillingData(html: html) {
+            return ZenBalance(
+                balanceUSD: data.balanceUSD,
+                monthlyLimitUSD: data.monthlyLimitUSD,
+                monthlyUsageUSD: data.monthlyUsageUSD,
+                useCredit: useCredit,
+                fetchedAt: fetchedAt
+            )
+        }
+
+        // The Go console page renders the available credit directly.
+        if let credit = parseAvailableCreditDollars(html: html) {
+            return ZenBalance(balanceUSD: credit, useCredit: useCredit, fetchedAt: fetchedAt)
+        }
+
+        return nil
     }
 
     static func parseBillingData(html: String) -> BillingData? {
@@ -117,6 +128,71 @@ enum BillingParser {
             monthlyLimitUSD: limitDollars,
             monthlyUsageUnits: usageDollars.map { $0 * unitsPerDollar }
         )
+    }
+
+    // MARK: - Go console page
+
+    /// Whether the "Extra Usage" switch (label "Use credit") is on. Prefers the
+    /// server-rendered `useBalance` flag, then falls back to the rendered switch.
+    static func parseUseCredit(html: String) -> Bool? {
+        parseUseBalanceFlag(html: html) ?? parseRenderedSwitch(html: html)
+    }
+
+    private static let useBalanceRegex = try! NSRegularExpression(
+        pattern: "useBalance\\s*:\\s*(!0|!1|true|false)"
+    )
+
+    private static func parseUseBalanceFlag(html: String) -> Bool? {
+        let range = NSRange(html.startIndex..., in: html)
+        guard
+            let match = useBalanceRegex.firstMatch(in: html, range: range),
+            match.numberOfRanges == 2,
+            let captured = Range(match.range(at: 1), in: html)
+        else {
+            return nil
+        }
+        let value = String(html[captured])
+        return value == "!0" || value == "true"
+    }
+
+    private static let ariaCheckedRegex = try! NSRegularExpression(
+        pattern: "aria-checked=\"(true|false)\""
+    )
+
+    /// Finds the switch rendered next to the "Use credit" label and reads the
+    /// closest `aria-checked` that precedes it.
+    private static func parseRenderedSwitch(html: String) -> Bool? {
+        guard let marker = html.range(of: "Use credit") else { return nil }
+        let lower = html.index(marker.lowerBound, offsetBy: -1_500, limitedBy: html.startIndex)
+            ?? html.startIndex
+        let scope = String(html[lower..<marker.lowerBound])
+
+        let range = NSRange(scope.startIndex..., in: scope)
+        guard
+            let match = ariaCheckedRegex.matches(in: scope, range: range).last,
+            match.numberOfRanges == 2,
+            let captured = Range(match.range(at: 1), in: scope)
+        else {
+            return nil
+        }
+        return String(scope[captured]) == "true"
+    }
+
+    private static let availableCreditRegex = try! NSRegularExpression(
+        pattern: "\\$([\\d,]+(?:\\.\\d+)?)[^$]{0,240}?available credit"
+    )
+
+    /// Reads the `$18.85 available credit` amount from the Go console page.
+    static func parseAvailableCreditDollars(html: String) -> Double? {
+        let range = NSRange(html.startIndex..., in: html)
+        guard
+            let match = availableCreditRegex.firstMatch(in: html, range: range),
+            match.numberOfRanges == 2,
+            let captured = Range(match.range(at: 1), in: html)
+        else {
+            return nil
+        }
+        return Double(String(html[captured]).replacingOccurrences(of: ",", with: ""))
     }
 
     private static func firstMatch(in text: String, pattern: String) -> String? {

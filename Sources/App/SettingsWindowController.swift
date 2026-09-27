@@ -219,8 +219,8 @@ final class SettingsWindowController: NSWindowController {
             disconnectButton.isEnabled = true
         } else {
             zenStatusLabel.stringValue =
-                "Not connected. Sign in to show your available credit "
-                + "(the Zen balance is not available through the API key)."
+                "Not connected. Sign in to show your available credit and Extra Usage state "
+                + "(not available through the API key)."
             disconnectButton.isEnabled = false
         }
 

@@ -87,46 +87,59 @@ final class OpenCodeAPI {
         }
     }
 
-    /// Reads the Zen credit balance from the workspace billing page. This is
-    /// not an official API: it relies on the browser session captured by the
-    /// embedded login.
+    /// Reads the Zen credit balance and the "Extra Usage" switch from the
+    /// workspace console. This is not an official API: it relies on the
+    /// browser session captured by the embedded login.
     func fetchBalance(cookie: String, workspaceID: String) async throws -> ZenBalance {
         guard !cookie.isEmpty, !workspaceID.isEmpty else { throw OpenCodeAPIError.missingSession }
-        guard let url = URL(string: "https://opencode.ai/workspace/\(workspaceID)/billing") else {
-            throw OpenCodeAPIError.balanceUnavailable
+
+        // Prefer the Go console page (credit + switch), then the billing
+        // settings page, then the legacy workspace path.
+        let paths = [
+            "console/\(workspaceID)/go",
+            "console/\(workspaceID)/settings/billing",
+            "workspace/\(workspaceID)/billing",
+        ]
+
+        var sawHTTPError: Int?
+        for path in paths {
+            guard let url = URL(string: "https://opencode.ai/\(path)") else { continue }
+
+            var request = URLRequest(url: url)
+            request.httpMethod = "GET"
+            request.setValue(cookie, forHTTPHeaderField: "Cookie")
+            request.setValue("text/html", forHTTPHeaderField: "Accept")
+            request.setValue(userAgent, forHTTPHeaderField: "User-Agent")
+            request.timeoutInterval = 20
+
+            let (data, response) = try await perform(request)
+
+            switch response.statusCode {
+            case 200:
+                break
+            case 401, 403:
+                throw OpenCodeAPIError.sessionExpired
+            default:
+                sawHTTPError = response.statusCode
+                continue
+            }
+
+            guard let html = String(data: data, encoding: .utf8) else { continue }
+
+            // An expired session serves the sign-in page with a 200 status.
+            if html.contains("Continue with GitHub") || html.contains("OpenAuth") {
+                throw OpenCodeAPIError.sessionExpired
+            }
+
+            if let balance = BillingParser.parse(html: html) {
+                return balance
+            }
         }
 
-        var request = URLRequest(url: url)
-        request.httpMethod = "GET"
-        request.setValue(cookie, forHTTPHeaderField: "Cookie")
-        request.setValue("text/html", forHTTPHeaderField: "Accept")
-        request.setValue(userAgent, forHTTPHeaderField: "User-Agent")
-        request.timeoutInterval = 20
-
-        let (data, response) = try await perform(request)
-
-        switch response.statusCode {
-        case 200:
-            break
-        case 401, 403:
-            throw OpenCodeAPIError.sessionExpired
-        default:
-            throw OpenCodeAPIError.http(status: response.statusCode)
+        if let status = sawHTTPError {
+            throw OpenCodeAPIError.http(status: status)
         }
-
-        guard let html = String(data: data, encoding: .utf8) else {
-            throw OpenCodeAPIError.balanceUnavailable
-        }
-
-        // An expired session serves the sign-in page with a 200 status.
-        if html.contains("Continue with GitHub") || html.contains("OpenAuth") {
-            throw OpenCodeAPIError.sessionExpired
-        }
-
-        guard let balance = BillingParser.parse(html: html) else {
-            throw OpenCodeAPIError.balanceUnavailable
-        }
-        return balance
+        throw OpenCodeAPIError.balanceUnavailable
     }
 
     private func perform(_ request: URLRequest) async throws -> (Data, HTTPURLResponse) {

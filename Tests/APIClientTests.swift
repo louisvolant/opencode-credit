@@ -66,11 +66,36 @@ enum APIClientTests {
             }
         }
 
-        await runAsyncSuite("OpenCodeAPI.fetchBalance reads the billing page") {
+        await runAsyncSuite("OpenCodeAPI.fetchBalance reads the Go console page") {
             let api = OpenCodeAPI(session: makeSession())
             MockURLProtocol.handler = { request in
                 checkEqual(request.value(forHTTPHeaderField: "Cookie"), "auth=abc", "sends the session cookie")
-                checkEqual(request.url?.path, "/workspace/wrk_test/billing", "calls the billing page")
+                checkEqual(request.url?.path, "/console/wrk_test/go", "calls the Go console page")
+                let html = """
+                <span class="text-[1.3125rem]">$18.85</span><span class="text-muted">available credit</span>
+                <input type="checkbox" role="switch" aria-checked="false" data-slot="switch-input">
+                <label data-slot="switch-label">Use credit</label>
+                """
+                return (ok(request.url), Data(html.utf8))
+            }
+
+            do {
+                let balance = try await api.fetchBalance(cookie: "auth=abc", workspaceID: "wrk_test")
+                checkEqual(balance.balanceUSD, 18.85, "reads $18.85 of credit")
+                checkEqual(balance.useCredit, false, "reads the Use credit switch")
+            } catch {
+                check(false, "unexpected error: \(error)")
+            }
+        }
+
+        await runAsyncSuite("OpenCodeAPI.fetchBalance falls back to the billing page") {
+            let api = OpenCodeAPI(session: makeSession())
+            MockURLProtocol.handler = { request in
+                let path = request.url?.path ?? ""
+                if path == "/console/wrk_test/go" {
+                    return (ok(request.url, status: 404), Data())
+                }
+                checkEqual(path, "/console/wrk_test/settings/billing", "falls back to the billing settings page")
                 let html = #"<html><script>_$HY.r["billing.get[\"wrk_test\"]"]=$R[21]=$R[2]($R[22]={p:0,s:0,f:0});$R[16]($R[22],$R[25]={balance:2200000000,monthlyLimit:20,monthlyUsage:12500000});</script></html>"#
                 return (ok(request.url), Data(html.utf8))
             }

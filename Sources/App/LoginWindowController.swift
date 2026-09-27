@@ -46,7 +46,7 @@ final class LoginWindowController: NSWindowController, WKNavigationDelegate {
         window.contentView = content
 
         instructionsLabel.stringValue =
-            "Continue with GitHub, then open your workspace billing page. "
+            "Continue with GitHub, then open your workspace console (Go or Billing page). "
             + "This window closes automatically once your workspace is detected."
         instructionsLabel.font = .systemFont(ofSize: 11)
         instructionsLabel.textColor = .secondaryLabelColor
@@ -118,10 +118,12 @@ final class LoginWindowController: NSWindowController, WKNavigationDelegate {
 
         let script = """
         (function() {
-          var links = document.querySelectorAll('a[href*="/workspace/"]');
+          var links = document.querySelectorAll('a[href*="/console/"], a[href*="/workspace/"]');
           for (var i = 0; i < links.length; i++) {
             var href = links[i].getAttribute('href') || '';
-            if (href.indexOf('/workspace/') !== -1) { return href; }
+            if (href.indexOf('/console/') !== -1 || href.indexOf('/workspace/') !== -1) {
+              return href;
+            }
           }
           return null;
         })();

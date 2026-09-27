@@ -13,6 +13,7 @@ final class PopoverViewController: NSViewController {
     private let zenTitleLabel = NSTextField(labelWithString: "OpenCode Zen")
     private let balanceLabel = NSTextField(labelWithString: "Not connected")
     private let balanceDetailLabel = NSTextField(labelWithString: "")
+    private let useCreditLabel = NSTextField(labelWithString: "")
     private let statusLabel = NSTextField(labelWithString: "")
     private let updatedLabel = NSTextField(labelWithString: "Never updated")
     private let versionLabel = NSTextField(labelWithString: "")
@@ -41,6 +42,10 @@ final class PopoverViewController: NSViewController {
         balanceDetailLabel.textColor = .secondaryLabelColor
         balanceDetailLabel.maximumNumberOfLines = 3
         balanceDetailLabel.lineBreakMode = .byWordWrapping
+
+        useCreditLabel.font = .systemFont(ofSize: 11)
+        useCreditLabel.textColor = .secondaryLabelColor
+        useCreditLabel.isHidden = true
 
         statusLabel.font = .systemFont(ofSize: 11)
         statusLabel.textColor = .secondaryLabelColor
@@ -80,6 +85,7 @@ final class PopoverViewController: NSViewController {
             zenTitleLabel,
             balanceLabel,
             balanceDetailLabel,
+            useCreditLabel,
             statusLabel,
             separator(),
             footer,
@@ -166,6 +172,14 @@ final class PopoverViewController: NSViewController {
             balanceLabel.stringValue = "Not connected"
             balanceLabel.textColor = .secondaryLabelColor
             balanceDetailLabel.stringValue = "Sign in from Settings to show your credit."
+        }
+
+        if let useCredit = balance?.useCredit {
+            useCreditLabel.stringValue = "Extra usage (credit): \(useCredit ? "On" : "Off")"
+            useCreditLabel.isHidden = false
+        } else {
+            useCreditLabel.stringValue = ""
+            useCreditLabel.isHidden = true
         }
 
         balanceDetailLabel.isHidden = balanceDetailLabel.stringValue.isEmpty
