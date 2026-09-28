@@ -15,12 +15,13 @@ enum Keychain {
             kSecAttrAccount as String: account,
         ]
 
-        SecItemDelete(baseQuery as CFDictionary)
+        let deleteStatus = SecItemDelete(baseQuery as CFDictionary)
 
         var attributes = baseQuery
         attributes[kSecValueData as String] = Data(value.utf8)
         attributes[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlock
-        SecItemAdd(attributes as CFDictionary, nil)
+        let addStatus = SecItemAdd(attributes as CFDictionary, nil)
+        Diagnostics.log("keychain set \(account): delete=\(deleteStatus) add=\(addStatus)")
     }
 
     static func get(_ account: String) -> String? {
@@ -34,6 +35,9 @@ enum Keychain {
 
         var result: AnyObject?
         let status = SecItemCopyMatching(query as CFDictionary, &result)
+        if status != errSecSuccess {
+            Diagnostics.log("keychain get \(account): status=\(status)")
+        }
         guard status == errSecSuccess, let data = result as? Data else { return nil }
         return String(data: data, encoding: .utf8)
     }

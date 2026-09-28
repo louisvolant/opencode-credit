@@ -6,7 +6,7 @@ import WebKit
 ///
 /// Google blocks OAuth inside embedded web views, so the user is expected to
 /// continue with GitHub.
-final class LoginWindowController: NSWindowController, WKNavigationDelegate {
+final class LoginWindowController: NSWindowController, WKNavigationDelegate, WKUIDelegate {
     /// Called on the main thread once a session has been captured.
     var onSuccess: (() -> Void)?
 
@@ -32,6 +32,7 @@ final class LoginWindowController: NSWindowController, WKNavigationDelegate {
     func show() {
         didFinish = false
         setStatus("Waiting for sign-in…")
+        Diagnostics.log("login window shown")
         load()
         NSApp.activate(ignoringOtherApps: true)
         window?.center()
@@ -86,6 +87,7 @@ final class LoginWindowController: NSWindowController, WKNavigationDelegate {
             "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 "
             + "(KHTML, like Gecko) Version/17.0 Safari/605.1.15"
         webView.navigationDelegate = self
+        webView.uiDelegate = self
         webView.translatesAutoresizingMaskIntoConstraints = false
 
         content.addSubview(topBar)
@@ -110,6 +112,7 @@ final class LoginWindowController: NSWindowController, WKNavigationDelegate {
     // MARK: - WKNavigationDelegate
 
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+        Diagnostics.log("didFinish \(Diagnostics.describe(webView.url))")
         guard !didFinish else { return }
         detectWorkspace { [weak self] workspaceID in
             guard let self else { return }
@@ -119,6 +122,12 @@ final class LoginWindowController: NSWindowController, WKNavigationDelegate {
                 self.setStatus("No workspace id on this page — open your console (Go or Billing) page.")
             }
         }
+    }
+
+    /// Some pages (Google OAuth in particular) call `window.close()`. Log it so
+    /// we can tell whether that is why the window disappears.
+    func webViewDidClose(_ webView: WKWebView) {
+        Diagnostics.log("webViewDidClose url=\(Diagnostics.describe(webView.url))")
     }
 
     @objc private func doneTapped() {
@@ -138,6 +147,7 @@ final class LoginWindowController: NSWindowController, WKNavigationDelegate {
     /// a single-page app, so the workspace id often only exists in its links.
     private func detectWorkspace(completion: @escaping (String?) -> Void) {
         if let id = WorkspaceURL.id(from: webView.url?.absoluteString) {
+            Diagnostics.log("workspace from URL: \(id)")
             completion(id)
             return
         }
@@ -150,17 +160,21 @@ final class LoginWindowController: NSWindowController, WKNavigationDelegate {
         })();
         """
         webView.evaluateJavaScript(script) { result, _ in
-            completion(WorkspaceURL.id(from: result as? String))
+            let id = WorkspaceURL.id(from: result as? String)
+            Diagnostics.log("workspace from HTML: \(id ?? "nil")")
+            completion(id)
         }
     }
 
     private func finish(with workspaceID: String) {
         guard !didFinish else { return }
         didFinish = true
+        Diagnostics.log("finish workspace=\(workspaceID)")
 
         webView.configuration.websiteDataStore.httpCookieStore.getAllCookies { [weak self] cookies in
             guard let self else { return }
             let relevant = cookies.filter { $0.domain.contains("opencode.ai") }
+            Diagnostics.log("cookies total=\(cookies.count) opencode=\(relevant.count)")
 
             guard !relevant.isEmpty else {
                 DispatchQueue.main.async {
@@ -174,6 +188,7 @@ final class LoginWindowController: NSWindowController, WKNavigationDelegate {
             let header = relevant.map { "\($0.name)=\($0.value)" }.joined(separator: "; ")
             DispatchQueue.main.async {
                 self.session.save(cookie: header, workspaceID: workspaceID)
+                Diagnostics.log("session saved, connected=\(self.session.isConnected)")
                 self.setStatus("Connected: \(workspaceID) (\(relevant.count) cookies).")
                 self.onSuccess?()
                 self.close()

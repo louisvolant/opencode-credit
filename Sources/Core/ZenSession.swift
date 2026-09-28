@@ -28,6 +28,7 @@ final class ZenSession {
     }
 
     func save(cookie: String, workspaceID: String) {
+        Diagnostics.log("zen session save: workspace=\(workspaceID) cookieLength=\(cookie.count)")
         Keychain.set(cookie, for: cookieAccount)
         Keychain.set(workspaceID, for: workspaceAccount)
     }
