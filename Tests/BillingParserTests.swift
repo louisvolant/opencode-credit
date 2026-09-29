@@ -96,19 +96,19 @@ enum BillingParserTests {
                 "reads the console wrk_ id"
             )
             checkEqual(
+                WorkspaceURL.id(from: "https://opencode.ai/console/favicon.ico"),
+                nil,
+                "does not mistake a path segment like 'favicon' for a workspace"
+            )
+            checkEqual(
                 WorkspaceURL.id(from: "/console/settings/billing"),
                 nil,
                 "ignores a reserved console segment"
             )
             checkEqual(
                 WorkspaceURL.id(from: "/workspace/abc123def"),
-                "abc123def",
-                "reads a plain id"
-            )
-            checkEqual(
-                WorkspaceURL.id(from: "/workspace/billing"),
                 nil,
-                "ignores a reserved segment"
+                "ignores an id without the wrk_ prefix"
             )
             checkEqual(
                 WorkspaceURL.id(from: "https://opencode.ai/auth"),

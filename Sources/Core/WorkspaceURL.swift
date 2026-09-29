@@ -2,18 +2,15 @@ import Foundation
 
 /// Extracts an OpenCode workspace id from a console URL or link.
 ///
-/// Examples: `https://opencode.ai/console/wrk_abc123/go`,
-/// `https://opencode.ai/workspace/wrk_abc123/billing` or `/workspace/abc123def`.
+/// Only ids carrying the `wrk_` prefix are accepted: scanning page HTML for a
+/// generic id is far too loose (it matched `/console/favicon…` once).
+///
+/// Examples: `https://opencode.ai/console/wrk_abc123/go` or
+/// `https://opencode.ai/workspace/wrk_abc123/billing`.
 enum WorkspaceURL {
     private static let patterns = [
         "/console/(wrk_[A-Za-z0-9]+)",
         "/workspace/(wrk_[A-Za-z0-9]+)",
-        "/console/([A-Za-z0-9_]{6,})",
-        "/workspace/([A-Za-z0-9_]{6,})",
-    ]
-
-    private static let reserved: Set<String> = [
-        "billing", "usage", "members", "settings", "keys", "auth", "workspace", "console",
     ]
 
     static func id(from string: String?) -> String? {
@@ -29,8 +26,7 @@ enum WorkspaceURL {
             else {
                 continue
             }
-            let value = String(string[captured])
-            if !reserved.contains(value) { return value }
+            return String(string[captured])
         }
         return nil
     }

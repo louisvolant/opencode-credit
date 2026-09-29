@@ -127,7 +127,9 @@ final class OpenCodeAPI {
             guard let html = String(data: data, encoding: .utf8) else { continue }
 
             // An expired session serves the sign-in page with a 200 status.
-            if html.contains("Continue with GitHub") || html.contains("OpenAuth") {
+            // Only the GitHub button is a reliable marker: "OpenAuth" also
+            // appears in the authenticated console bundle.
+            if html.contains("Continue with GitHub") {
                 throw OpenCodeAPIError.sessionExpired
             }
 
