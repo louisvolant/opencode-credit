@@ -95,10 +95,9 @@ final class RefreshService {
 
             if let session {
                 do {
-                    balance = try await self.api.fetchBalance(
-                        cookie: session.cookie,
-                        workspaceID: session.workspaceID
-                    )
+                    // The console is client-side rendered, so read the DOM of
+                    // the Go page in a hidden web view rather than scraping it.
+                    balance = try await ConsoleReader().read(workspaceID: session.workspaceID)
                 } catch {
                     balanceError = Self.message(for: error)
                     if let apiError = error as? OpenCodeAPIError, apiError == .sessionExpired {
