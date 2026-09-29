@@ -103,6 +103,7 @@ final class OpenCodeAPI {
 
         var sawHTTPError: Int?
         var sawSignIn = false
+        var sawAuthenticated = false
 
         for path in paths {
             guard let url = URL(string: "https://opencode.ai/\(path)") else { continue }
@@ -141,6 +142,8 @@ final class OpenCodeAPI {
                 continue
             }
 
+            sawAuthenticated = true
+
             if let balance = BillingParser.parse(html: html) {
                 Diagnostics.log(
                     "balance \(path): parsed credit=\(balance.balanceUSD) "
@@ -148,8 +151,11 @@ final class OpenCodeAPI {
                 )
                 return balance
             }
+
+            Diagnostics.log("balance \(path) body: \(String(html.prefix(1_800)))")
         }
 
+        if sawAuthenticated { throw OpenCodeAPIError.balanceUnavailable }
         if sawSignIn { throw OpenCodeAPIError.sessionExpired }
         if let status = sawHTTPError { throw OpenCodeAPIError.http(status: status) }
         throw OpenCodeAPIError.balanceUnavailable

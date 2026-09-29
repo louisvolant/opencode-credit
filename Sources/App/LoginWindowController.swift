@@ -174,7 +174,10 @@ final class LoginWindowController: NSWindowController, WKNavigationDelegate, WKU
         webView.configuration.websiteDataStore.httpCookieStore.getAllCookies { [weak self] cookies in
             guard let self else { return }
             let relevant = cookies.filter { $0.domain.contains("opencode.ai") }
-            Diagnostics.log("cookies total=\(cookies.count) opencode=\(relevant.count)")
+            Diagnostics.log(
+                "cookies total=\(cookies.count) opencode=\(relevant.count) "
+                + "names=\(relevant.map(\.name).joined(separator: ","))"
+            )
 
             guard !relevant.isEmpty else {
                 DispatchQueue.main.async {
