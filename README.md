@@ -41,6 +41,19 @@ brew install --cask louisvolant/opencode-statusbar/opencode-credit
 ```
 
 Homebrew resolves the tap automatically, so no separate `brew tap` is needed.
+
+> **The short name does not work.** `brew install opencode-credit` fails with
+> `No available formula with the name "opencode-credit"` or `Cask
+> 'opencode-credit' is unavailable`. Homebrew only resolves a short cask name
+> once its tap is already installed, and it never guesses which tap provides
+> it. Always use the fully qualified `louisvolant/opencode-statusbar/` form
+> shown above. If you prefer short names, tap it once yourself:
+>
+> ```sh
+> brew tap louisvolant/opencode-statusbar
+> brew install --cask opencode-credit
+> ```
+
 The app is **not notarised** by Apple, so macOS blocks the first launch. On
 macOS 15 and later the right-click shortcut is not always enough: open
 **System Settings → Privacy & Security** and click **"Open Anyway"**, or run:
