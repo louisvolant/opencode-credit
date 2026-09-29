@@ -155,7 +155,12 @@ final class OpenCodeAPI {
             Diagnostics.log("balance \(path) body: \(String(html.prefix(1_800)))")
         }
 
-        if sawAuthenticated { throw OpenCodeAPIError.balanceUnavailable }
+        if sawAuthenticated {
+            // TEMP: the console renders client-side, so nothing was parseable.
+            // Probe the JSON API to find the real data source.
+            await probeAPIEndpoints(cookie: cookie, workspaceID: workspaceID)
+            throw OpenCodeAPIError.balanceUnavailable
+        }
         if sawSignIn { throw OpenCodeAPIError.sessionExpired }
         if let status = sawHTTPError { throw OpenCodeAPIError.http(status: status) }
         throw OpenCodeAPIError.balanceUnavailable
@@ -167,6 +172,33 @@ final class OpenCodeAPI {
         if url.host == "auth.opencode.ai" { return true }
         let path = url.path.lowercased()
         return path.hasPrefix("/auth") || path.hasPrefix("/signin") || path.hasPrefix("/login")
+    }
+
+    /// TEMP: probes candidate JSON endpoints with the session cookie so we can
+    /// discover where the console actually reads the credit from.
+    private func probeAPIEndpoints(cookie: String, workspaceID: String) async {
+        let candidates = [
+            "api/orgs/\(workspaceID)/go/status",
+            "api/orgs/\(workspaceID)/usage",
+            "api/billing/status",
+            "api/usage/orgs/\(workspaceID)/go/status",
+        ]
+        for candidate in candidates {
+            guard let url = URL(string: "https://opencode.ai/\(candidate)") else { continue }
+            var request = URLRequest(url: url)
+            request.httpMethod = "GET"
+            request.setValue(cookie, forHTTPHeaderField: "Cookie")
+            request.setValue("application/json", forHTTPHeaderField: "Accept")
+            request.setValue(userAgent, forHTTPHeaderField: "User-Agent")
+            request.timeoutInterval = 20
+            guard let (data, response) = try? await perform(request) else { continue }
+            let body = String(data: data, encoding: .utf8) ?? ""
+            Diagnostics.log(
+                "probe \(candidate): status=\(response.statusCode) "
+                + "ct=\(response.value(forHTTPHeaderField: "Content-Type") ?? "-") "
+                + "body=\(body.prefix(500))"
+            )
+        }
     }
 
     private func perform(_ request: URLRequest) async throws -> (Data, HTTPURLResponse) {
