@@ -17,8 +17,8 @@ Command Line Tools.
 - **Rolling usage** — percentage of the 5-hour window, with a reset countdown.
 - **Weekly usage** — percentage of the weekly window, with a reset countdown.
 - **Monthly usage** — percentage of the monthly window, with a reset countdown.
-- **OpenCode Zen credit** — available balance in USD, the monthly usage, and
-  the state of the "Extra Usage" (use credit) switch.
+- **OpenCode Zen credit** — available balance in USD, and a toggle for the
+  "Extra Usage" (use credit) switch.
 - The OpenCode logo in the menu bar next to the rolling percentage,
   colour-coded green / orange / red.
 - Automatic refresh every 5 minutes (configurable) and a manual refresh button.
@@ -128,10 +128,12 @@ app opens an embedded login window:
 3. The window detects your workspace automatically and closes.
 
 The app stores the resulting session (cookie + workspace id) in the Keychain
-and reads your workspace **Go console page** (`/console/<workspace>/go`), which
-shows both the available credit and the **Extra Usage** switch ("Use credit").
-It falls back to the billing settings page if needed. If the session expires,
-the app asks you to sign in again. The switch is displayed **read-only**.
+and reads your workspace **Go console page** (`/console/<workspace>/go`). The
+console is a client-side app, so the credit and the switch are read from the
+**rendered page**: the app loads it in a hidden web view and reads the DOM. The
+**Extra Usage** switch ("Use credit") can be toggled directly from the popover:
+the app clicks the real switch, so the console performs its own request. If the
+session expires, sign in again.
 
 ## How the data is fetched
 
@@ -141,11 +143,10 @@ the app asks you to sign in again. The switch is displayed **read-only**.
   percentages (floored) that can lag the web console by up to one point — e.g.
   the app may show 79% while the console shows 80%.
 - **Zen credit** is not exposed by the API (`/zen/v1/balance` returns 404), so
-  the app reads your workspace console page with the captured browser session:
-  the available credit and the state of the **Extra Usage** ("Use credit")
-  switch. This part is **best effort**: it may break if OpenCode changes its
-  console, in which case the credit is hidden and everything else keeps
-  working.
+  the app loads your workspace Go console page in a hidden web view and reads
+  the rendered DOM for the available credit and the **Extra Usage** switch.
+  This part is **best effort**: it may break if OpenCode changes its console,
+  in which case the credit is hidden and everything else keeps working.
 
 ## Privacy
 
@@ -165,8 +166,8 @@ the app asks you to sign in again. The switch is displayed **read-only**.
   shows exactly what the API returns. This is not a refresh or caching issue —
   the tooltip on the menu bar icon shows the last successful refresh time.
 - **The balance says "Not connected".** Sign in from Settings.
-- **The balance shows "—" or an error.** The billing page format changed. The
-  rest of the app is unaffected; please open an issue.
+- **The balance shows "—" or an error.** The console page changed. The rest of
+  the app is unaffected; please open an issue.
 - **"OpenCode Credit.app is damaged" when opening.** Remove the quarantine
   attribute as shown in the install section.
 - **Launch at login does not stick.** Move the app to `/Applications` first;

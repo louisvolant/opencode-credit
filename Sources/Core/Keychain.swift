@@ -35,7 +35,7 @@ enum Keychain {
 
         var result: AnyObject?
         let status = SecItemCopyMatching(query as CFDictionary, &result)
-        if status != errSecSuccess {
+        if status != errSecSuccess && status != errSecItemNotFound {
             Diagnostics.log("keychain get \(account): status=\(status)")
         }
         guard status == errSecSuccess, let data = result as? Data else { return nil }

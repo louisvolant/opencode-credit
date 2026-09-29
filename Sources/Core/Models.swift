@@ -67,27 +67,17 @@ struct UsageWindow: Codable, Equatable, Sendable {
     }
 }
 
-/// The OpenCode Zen available credit, read from the workspace billing or Go
-/// console page.
+/// The OpenCode Zen available credit and the "Extra Usage" switch, read from
+/// the console Go page.
 struct ZenBalance: Codable, Equatable, Sendable {
     let balanceUSD: Double
-    let monthlyLimitUSD: Double?
-    let monthlyUsageUSD: Double?
     /// Whether "Extra Usage" (use the balance after reaching the Go limits) is
     /// enabled. `nil` when the page did not expose it.
     let useCredit: Bool?
     let fetchedAt: Date
 
-    init(
-        balanceUSD: Double,
-        monthlyLimitUSD: Double? = nil,
-        monthlyUsageUSD: Double? = nil,
-        useCredit: Bool? = nil,
-        fetchedAt: Date
-    ) {
+    init(balanceUSD: Double, useCredit: Bool? = nil, fetchedAt: Date) {
         self.balanceUSD = balanceUSD
-        self.monthlyLimitUSD = monthlyLimitUSD
-        self.monthlyUsageUSD = monthlyUsageUSD
         self.useCredit = useCredit
         self.fetchedAt = fetchedAt
     }

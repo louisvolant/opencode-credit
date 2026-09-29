@@ -4,7 +4,7 @@ runSuite("OpenCode Credit core tests") {
     UsageTests.run()
     ConfigTests.run()
     FormattingTests.run()
-    BillingParserTests.run()
+    WorkspaceTests.run()
     SettingsTests.run()
     NotificationTests.run()
 }

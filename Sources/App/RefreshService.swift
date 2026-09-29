@@ -97,7 +97,7 @@ final class RefreshService {
                 do {
                     // The console is client-side rendered, so read the DOM of
                     // the Go page in a hidden web view rather than scraping it.
-                    balance = try await ConsoleReader().read(workspaceID: session.workspaceID)
+                    balance = try await ConsoleReader().run(workspaceID: session.workspaceID)
                 } catch {
                     balanceError = Self.message(for: error)
                     if let apiError = error as? OpenCodeAPIError, apiError == .sessionExpired {
@@ -155,6 +155,30 @@ final class RefreshService {
     /// Re-schedules the timer using the current settings.
     func rescheduleTimer() {
         scheduleTimer()
+    }
+
+    /// Toggles the "Extra Usage" switch by clicking the real switch in the
+    /// console (which lets the console perform its own CSRF-protected request).
+    func setUseCredit(_ enabled: Bool) {
+        guard let session = zenSession.credentials else { return }
+
+        Task { [weak self] in
+            guard let self else { return }
+            do {
+                let updated = try await ConsoleReader(request: .setExtraUsage(enabled))
+                    .run(workspaceID: session.workspaceID)
+                await MainActor.run {
+                    self.balance = updated
+                    self.balanceError = nil
+                    self.onUpdate?()
+                }
+            } catch {
+                await MainActor.run {
+                    self.balanceError = Self.message(for: error)
+                    self.onUpdate?()
+                }
+            }
+        }
     }
 
     private func scheduleTimer() {

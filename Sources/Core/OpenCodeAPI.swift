@@ -28,7 +28,7 @@ enum OpenCodeAPIError: LocalizedError, Equatable, Sendable {
         case .sessionExpired:
             return "Your OpenCode session expired. Sign in again."
         case .balanceUnavailable:
-            return "Could not read the credit balance from the billing page."
+            return "Could not read the credit balance from the console."
         case .http(let status):
             return "The server returned HTTP \(status)."
         case .decoding(let detail):
@@ -39,15 +39,15 @@ enum OpenCodeAPIError: LocalizedError, Equatable, Sendable {
     }
 }
 
-/// Thin client for the OpenCode endpoints used by the app.
+/// Client for the official OpenCode Go usage endpoint.
+///
+/// The Zen credit is read separately by `ConsoleReader`, because the console is
+/// client-side rendered and exposes no usable API outside a browser.
 final class OpenCodeAPI {
     static let shared = OpenCodeAPI()
 
     private let session: URLSession
     private let usageURL = URL(string: "https://opencode.ai/zen/go/v1/usage")!
-    private let userAgent =
-        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 "
-        + "(KHTML, like Gecko) Version/17.0 Safari/605.1.15"
 
     init(session: URLSession = .shared) {
         self.session = session
@@ -85,88 +85,6 @@ final class OpenCodeAPI {
         } catch {
             throw OpenCodeAPIError.decoding(error.localizedDescription)
         }
-    }
-
-    /// Reads the Zen credit balance and the "Extra Usage" switch from the
-    /// workspace console. This is not an official API: it relies on the
-    /// browser session captured by the embedded login.
-    func fetchBalance(cookie: String, workspaceID: String) async throws -> ZenBalance {
-        guard !cookie.isEmpty, !workspaceID.isEmpty else { throw OpenCodeAPIError.missingSession }
-
-        // Prefer the Go console page (credit + switch), then the billing
-        // settings page, then the legacy workspace path.
-        let paths = [
-            "console/\(workspaceID)/go",
-            "console/\(workspaceID)/settings/billing",
-            "workspace/\(workspaceID)/billing",
-        ]
-
-        var sawHTTPError: Int?
-        var sawSignIn = false
-        var sawAuthenticated = false
-
-        for path in paths {
-            guard let url = URL(string: "https://opencode.ai/\(path)") else { continue }
-
-            var request = URLRequest(url: url)
-            request.httpMethod = "GET"
-            request.setValue(cookie, forHTTPHeaderField: "Cookie")
-            request.setValue("text/html", forHTTPHeaderField: "Accept")
-            request.setValue(userAgent, forHTTPHeaderField: "User-Agent")
-            request.timeoutInterval = 20
-
-            let (data, response) = try await perform(request)
-            let html = String(data: data, encoding: .utf8) ?? ""
-
-            Diagnostics.log(
-                "balance \(path): status=\(response.statusCode) final=\(Diagnostics.describe(response.url)) "
-                + "bytes=\(data.count) signIn=\(html.contains("Continue with GitHub")) "
-                + "hasCreditText=\(html.contains("available credit"))"
-            )
-
-            switch response.statusCode {
-            case 200:
-                break
-            case 401, 403:
-                throw OpenCodeAPIError.sessionExpired
-            default:
-                sawHTTPError = response.statusCode
-                continue
-            }
-
-            // An expired session redirects to the auth host. Do not rely on the
-            // page text: the authenticated console bundle also contains the
-            // "Continue with GitHub" string.
-            if Self.isSignInResponse(response) {
-                sawSignIn = true
-                continue
-            }
-
-            sawAuthenticated = true
-
-            if let balance = BillingParser.parse(html: html) {
-                Diagnostics.log(
-                    "balance \(path): parsed credit=\(balance.balanceUSD) "
-                    + "useCredit=\(String(describing: balance.useCredit))"
-                )
-                return balance
-            }
-
-            Diagnostics.log("balance \(path) body: \(String(html.prefix(1_800)))")
-        }
-
-        if sawAuthenticated { throw OpenCodeAPIError.balanceUnavailable }
-        if sawSignIn { throw OpenCodeAPIError.sessionExpired }
-        if let status = sawHTTPError { throw OpenCodeAPIError.http(status: status) }
-        throw OpenCodeAPIError.balanceUnavailable
-    }
-
-    /// Whether the response ended up on the sign-in flow (after redirects).
-    private static func isSignInResponse(_ response: HTTPURLResponse) -> Bool {
-        guard let url = response.url else { return false }
-        if url.host == "auth.opencode.ai" { return true }
-        let path = url.path.lowercased()
-        return path.hasPrefix("/auth") || path.hasPrefix("/signin") || path.hasPrefix("/login")
     }
 
     private func perform(_ request: URLRequest) async throws -> (Data, HTTPURLResponse) {

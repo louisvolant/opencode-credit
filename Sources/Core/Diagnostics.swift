@@ -17,6 +17,12 @@ enum Diagnostics {
         let line = "\(ISO8601.string(from: Date())) \(message)\n"
         guard let data = line.data(using: .utf8) else { return }
 
+        // Keep the file bounded: start over once it grows past ~256 KB.
+        if let attributes = try? FileManager.default.attributesOfItem(atPath: logURL.path),
+           let size = attributes[.size] as? Int, size > 256_000 {
+            try? FileManager.default.removeItem(at: logURL)
+        }
+
         if let handle = try? FileHandle(forWritingTo: logURL) {
             defer { try? handle.close() }
             _ = try? handle.seekToEnd()

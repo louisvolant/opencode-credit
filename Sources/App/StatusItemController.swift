@@ -31,6 +31,9 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
         popoverController.onRefresh = { [weak self] in self?.refreshService.refresh() }
         popoverController.onOpenSettings = { [weak self] in self?.settingsWindowController.show() }
         popoverController.onQuit = { NSApp.terminate(nil) }
+        popoverController.onToggleUseCredit = { [weak self] enabled in
+            self?.refreshService.setUseCredit(enabled)
+        }
 
         refreshService.onUpdate = { [weak self] in self?.render() }
 

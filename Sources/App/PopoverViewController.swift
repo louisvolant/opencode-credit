@@ -5,6 +5,7 @@ final class PopoverViewController: NSViewController {
     var onRefresh: (() -> Void)?
     var onOpenSettings: (() -> Void)?
     var onQuit: (() -> Void)?
+    var onToggleUseCredit: ((Bool) -> Void)?
 
     private let headerLabel = NSTextField(labelWithString: "OpenCode Go")
     private let rollingRow = UsageRowView(title: "Rolling usage")
@@ -13,7 +14,11 @@ final class PopoverViewController: NSViewController {
     private let zenTitleLabel = NSTextField(labelWithString: "OpenCode Zen")
     private let balanceLabel = NSTextField(labelWithString: "Not connected")
     private let balanceDetailLabel = NSTextField(labelWithString: "")
-    private let useCreditLabel = NSTextField(labelWithString: "")
+    private let useCreditCheckbox = NSButton(
+        checkboxWithTitle: "Extra usage (credit)",
+        target: nil,
+        action: nil
+    )
     private let statusLabel = NSTextField(labelWithString: "")
     private let updatedLabel = NSTextField(labelWithString: "Never updated")
     private let versionLabel = NSTextField(labelWithString: "")
@@ -43,9 +48,11 @@ final class PopoverViewController: NSViewController {
         balanceDetailLabel.maximumNumberOfLines = 3
         balanceDetailLabel.lineBreakMode = .byWordWrapping
 
-        useCreditLabel.font = .systemFont(ofSize: 11)
-        useCreditLabel.textColor = .secondaryLabelColor
-        useCreditLabel.isHidden = true
+        useCreditCheckbox.target = self
+        useCreditCheckbox.action = #selector(useCreditToggled)
+        useCreditCheckbox.translatesAutoresizingMaskIntoConstraints = false
+        useCreditCheckbox.toolTip = "Use your balance after reaching the Go limits"
+        useCreditCheckbox.isHidden = true
 
         statusLabel.font = .systemFont(ofSize: 11)
         statusLabel.textColor = .secondaryLabelColor
@@ -85,7 +92,7 @@ final class PopoverViewController: NSViewController {
             zenTitleLabel,
             balanceLabel,
             balanceDetailLabel,
-            useCreditLabel,
+            useCreditCheckbox,
             statusLabel,
             separator(),
             footer,
@@ -155,19 +162,11 @@ final class PopoverViewController: NSViewController {
         if let balance {
             balanceLabel.stringValue = Formatting.currency(balance.balanceUSD)
             balanceLabel.textColor = .labelColor
-
-            if let usage = balance.monthlyUsageUSD, let limit = balance.monthlyLimitUSD {
-                balanceDetailLabel.stringValue =
-                    "Used \(Formatting.currency(usage)) of \(Formatting.currency(limit)) this month"
-            } else if let usage = balance.monthlyUsageUSD {
-                balanceDetailLabel.stringValue = "Used \(Formatting.currency(usage)) this month"
-            } else {
-                balanceDetailLabel.stringValue = ""
-            }
+            balanceDetailLabel.stringValue = ""
         } else if isConnected {
             balanceLabel.stringValue = "—"
             balanceLabel.textColor = .secondaryLabelColor
-            balanceDetailLabel.stringValue = error ?? "Reading the billing page…"
+            balanceDetailLabel.stringValue = error ?? "Reading the console…"
         } else {
             balanceLabel.stringValue = "Not connected"
             balanceLabel.textColor = .secondaryLabelColor
@@ -175,11 +174,11 @@ final class PopoverViewController: NSViewController {
         }
 
         if let useCredit = balance?.useCredit {
-            useCreditLabel.stringValue = "Extra usage (credit): \(useCredit ? "On" : "Off")"
-            useCreditLabel.isHidden = false
+            useCreditCheckbox.state = useCredit ? .on : .off
+            useCreditCheckbox.isEnabled = true
+            useCreditCheckbox.isHidden = false
         } else {
-            useCreditLabel.stringValue = ""
-            useCreditLabel.isHidden = true
+            useCreditCheckbox.isHidden = true
         }
 
         balanceDetailLabel.isHidden = balanceDetailLabel.stringValue.isEmpty
@@ -190,6 +189,12 @@ final class PopoverViewController: NSViewController {
     @objc private func refreshTapped() { onRefresh?() }
     @objc private func settingsTapped() { onOpenSettings?() }
     @objc private func quitTapped() { onQuit?() }
+
+    @objc private func useCreditToggled() {
+        let enabled = useCreditCheckbox.state == .on
+        useCreditCheckbox.isEnabled = false
+        onToggleUseCredit?(enabled)
+    }
 
     // MARK: - Helpers
 
