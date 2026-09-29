@@ -150,7 +150,9 @@ session expires, sign in again.
 
 ## Privacy
 
-- Your API key and Zen session are stored in the macOS Keychain.
+- Your API key and Zen session are stored in the macOS Keychain. On Macs where
+  the Keychain is restricted (some managed/MDM machines), the Zen session falls
+  back to the app's local preferences.
 - The app only talks to `opencode.ai`. There is no analytics, no telemetry and
   no third-party server.
 

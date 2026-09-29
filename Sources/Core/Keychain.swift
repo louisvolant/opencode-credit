@@ -8,7 +8,8 @@ import Security
 enum Keychain {
     static let service = "com.louisvolant.opencode-credit"
 
-    static func set(_ value: String, for account: String) {
+    @discardableResult
+    static func set(_ value: String, for account: String) -> OSStatus {
         let baseQuery: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
@@ -22,6 +23,7 @@ enum Keychain {
         attributes[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlock
         let addStatus = SecItemAdd(attributes as CFDictionary, nil)
         Diagnostics.log("keychain set \(account): delete=\(deleteStatus) add=\(addStatus)")
+        return addStatus
     }
 
     static func get(_ account: String) -> String? {
