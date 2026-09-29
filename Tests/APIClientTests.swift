@@ -111,14 +111,29 @@ enum APIClientTests {
 
         await runAsyncSuite("OpenCodeAPI.fetchBalance detects an expired session") {
             let api = OpenCodeAPI(session: makeSession())
-            MockURLProtocol.handler = { request in
-                (ok(request.url), Data(#"<html><body>Continue with GitHub</body></html>"#.utf8))
+            MockURLProtocol.handler = { _ in
+                // The console redirects to the auth host, served with HTTP 200.
+                let auth = URL(string: "https://auth.opencode.ai/authorize")!
+                return (ok(auth, status: 200), Data(#"<html><body>Continue with GitHub</body></html>"#.utf8))
             }
             do {
                 _ = try await api.fetchBalance(cookie: "auth=abc", workspaceID: "wrk_test")
                 check(false, "expected sessionExpired")
             } catch let error as OpenCodeAPIError {
-                checkEqual(error, .sessionExpired, "detects the sign-in page served with HTTP 200")
+                checkEqual(error, .sessionExpired, "detects a redirect to the auth host")
+            } catch {
+                check(false, "unexpected error: \(error)")
+            }
+        }
+
+        await runAsyncSuite("OpenCodeAPI.fetchBalance maps 401 to an expired session") {
+            let api = OpenCodeAPI(session: makeSession())
+            MockURLProtocol.handler = { request in (ok(request.url, status: 401), Data()) }
+            do {
+                _ = try await api.fetchBalance(cookie: "auth=abc", workspaceID: "wrk_test")
+                check(false, "expected sessionExpired")
+            } catch let error as OpenCodeAPIError {
+                checkEqual(error, .sessionExpired, "a 401 means the session expired")
             } catch {
                 check(false, "unexpected error: \(error)")
             }

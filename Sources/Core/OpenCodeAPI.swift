@@ -102,6 +102,8 @@ final class OpenCodeAPI {
         ]
 
         var sawHTTPError: Int?
+        var sawSignIn = false
+
         for path in paths {
             guard let url = URL(string: "https://opencode.ai/\(path)") else { continue }
 
@@ -113,6 +115,13 @@ final class OpenCodeAPI {
             request.timeoutInterval = 20
 
             let (data, response) = try await perform(request)
+            let html = String(data: data, encoding: .utf8) ?? ""
+
+            Diagnostics.log(
+                "balance \(path): status=\(response.statusCode) final=\(Diagnostics.describe(response.url)) "
+                + "bytes=\(data.count) signIn=\(html.contains("Continue with GitHub")) "
+                + "hasCreditText=\(html.contains("available credit"))"
+            )
 
             switch response.statusCode {
             case 200:
@@ -124,24 +133,34 @@ final class OpenCodeAPI {
                 continue
             }
 
-            guard let html = String(data: data, encoding: .utf8) else { continue }
-
-            // An expired session serves the sign-in page with a 200 status.
-            // Only the GitHub button is a reliable marker: "OpenAuth" also
-            // appears in the authenticated console bundle.
-            if html.contains("Continue with GitHub") {
-                throw OpenCodeAPIError.sessionExpired
+            // An expired session redirects to the auth host. Do not rely on the
+            // page text: the authenticated console bundle also contains the
+            // "Continue with GitHub" string.
+            if Self.isSignInResponse(response) {
+                sawSignIn = true
+                continue
             }
 
             if let balance = BillingParser.parse(html: html) {
+                Diagnostics.log(
+                    "balance \(path): parsed credit=\(balance.balanceUSD) "
+                    + "useCredit=\(String(describing: balance.useCredit))"
+                )
                 return balance
             }
         }
 
-        if let status = sawHTTPError {
-            throw OpenCodeAPIError.http(status: status)
-        }
+        if sawSignIn { throw OpenCodeAPIError.sessionExpired }
+        if let status = sawHTTPError { throw OpenCodeAPIError.http(status: status) }
         throw OpenCodeAPIError.balanceUnavailable
+    }
+
+    /// Whether the response ended up on the sign-in flow (after redirects).
+    private static func isSignInResponse(_ response: HTTPURLResponse) -> Bool {
+        guard let url = response.url else { return false }
+        if url.host == "auth.opencode.ai" { return true }
+        let path = url.path.lowercased()
+        return path.hasPrefix("/auth") || path.hasPrefix("/signin") || path.hasPrefix("/login")
     }
 
     private func perform(_ request: URLRequest) async throws -> (Data, HTTPURLResponse) {

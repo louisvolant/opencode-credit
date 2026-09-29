@@ -141,7 +141,9 @@ final class RefreshService {
                 }
 
                 if outcome.sessionExpired {
-                    self.zenSession.clear()
+                    // Keep the captured session: a single failed read must not
+                    // destroy a valid cookie. The user can sign in again from
+                    // Settings to refresh it.
                     self.balance = nil
                     self.balanceError = OpenCodeAPIError.sessionExpired.errorDescription
                 }
