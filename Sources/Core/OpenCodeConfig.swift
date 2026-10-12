@@ -3,10 +3,20 @@ import Foundation
 /// Finds an OpenCode API key in the user's existing OpenCode installation, so
 /// that most people do not have to configure anything.
 ///
-/// Two config shapes are supported:
+/// Config shapes are supported across OpenCode versions:
 ///   - v1: `provider.<id>.options.apiKey`
-///   - v2: `providers.<id>.apiKey` (entries can also be matched by their
-///     `type` field)
+///   - v2 beta: `providers.<id>.apiKey`
+///   - OpenCode 2.0 native: `providers.<id>.settings.apiKey` (provider
+///     `options` became `settings`)
+///
+/// An entry can also be matched by its `type` (v2 beta) or `canonical`
+/// (native 2.0) field, so a custom provider that inherits the OpenCode Go
+/// catalog is recognised even when its id is not one of the known ones.
+///
+/// Supporting every shape keeps key discovery working when the user migrates
+/// their config to a newer OpenCode format. This is intentionally defensive:
+/// the cost is a couple of dictionary lookups, and the alternative is silently
+/// losing the key (and showing stale usage) after an upgrade.
 ///
 /// Values may use OpenCode's variable substitution: `{env:NAME}` for an
 /// environment variable and `{file:path}` for the contents of a file.
@@ -69,13 +79,14 @@ enum OpenCodeConfig {
             }
         }
 
-        // 2. Any entry whose `type` names a known provider.
+        // 2. Any entry whose `type` (v2 beta) or `canonical` (native 2.0)
+        //    names a known provider.
         for container in containers {
             for value in container.values {
                 guard
                     let entry = value as? [String: Any],
-                    let type = entry["type"] as? String,
-                    providerIds.contains(type)
+                    let marker = (entry["type"] as? String) ?? (entry["canonical"] as? String),
+                    providerIds.contains(marker)
                 else {
                     continue
                 }
@@ -119,14 +130,17 @@ enum OpenCodeConfig {
 
     // MARK: - Helpers
 
-    /// Reads `options.apiKey` or `apiKey` from a provider entry and resolves any
-    /// variable substitution. Returns nil when the value is missing or empty.
+    /// Reads the API key from a provider entry, whichever config shape it uses
+    /// (`options.apiKey`, `settings.apiKey` or a top-level `apiKey`), and
+    /// resolves any variable substitution. Returns nil when the value is
+    /// missing or empty.
     private static func key(
         from entry: [String: Any],
         configDirectory: URL,
         environment: [String: String]
     ) -> String? {
         let raw = (entry["options"] as? [String: Any])?["apiKey"] as? String
+            ?? (entry["settings"] as? [String: Any])?["apiKey"] as? String
             ?? entry["apiKey"] as? String
         guard let raw else { return nil }
         return resolve(raw, configDirectory: configDirectory, environment: environment)

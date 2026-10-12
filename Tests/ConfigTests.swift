@@ -100,6 +100,38 @@ enum ConfigTests {
             checkEqual(resolved?.key, "oc_sk_type", "matches an entry by its type field")
         }
 
+        runSuite("v2 native opencode.json key resolution") {
+            let home = makeTempHome()
+            defer { cleanup(home) }
+
+            let configURL = home.appendingPathComponent(".config/opencode/opencode.json")
+            write(
+                #"{"providers":{"opencode-go":{"package":"@opencode/ai/providers/openai-compatible","settings":{"baseURL":"https://opencode.ai/zen/go/v1","apiKey":"oc_sk_native"}}}}"#,
+                to: configURL
+            )
+
+            let resolved = OpenCodeConfig.keyFromConfigFile(homeDirectory: home, environment: [:])
+            checkEqual(resolved?.key, "oc_sk_native", "reads providers.<id>.settings.apiKey")
+            checkEqual(
+                resolved?.source,
+                .configFile(path: configURL.path),
+                "reports the config file path"
+            )
+        }
+
+        runSuite("v2 native config matched by canonical provider") {
+            let home = makeTempHome()
+            defer { cleanup(home) }
+
+            write(
+                #"{"providers":{"my-go":{"canonical":"opencode-go","settings":{"apiKey":"oc_sk_canonical"}}}}"#,
+                to: home.appendingPathComponent(".config/opencode/opencode.json")
+            )
+
+            let resolved = OpenCodeConfig.keyFromConfigFile(homeDirectory: home, environment: [:])
+            checkEqual(resolved?.key, "oc_sk_canonical", "matches an entry by its canonical field")
+        }
+
         runSuite("config value substitution") {
             let home = makeTempHome()
             defer { cleanup(home) }

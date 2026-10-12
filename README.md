@@ -117,11 +117,22 @@ order and uses the first match:
    environment, so this mostly helps when launching from a terminal.
 3. Your existing OpenCode configuration, if present:
    - `~/.config/opencode/opencode.json`:
-     - v2 shape: `providers.<id>.apiKey` (or an entry whose `type` is a known
-       provider id such as `opencode-go`),
+     - OpenCode 2.0 native shape: `providers.<id>.settings.apiKey`,
+     - v2 beta shape: `providers.<id>.apiKey`,
      - v1 shape: `provider.<id>.options.apiKey`,
+     - entries are matched by provider id (`opencode-go`, `zen`, `opencode`),
+       by their `type` field (v2 beta) or by their `canonical` field (native
+       2.0), so a custom provider that inherits the OpenCode Go catalog is
+       recognised too.
    - `$XDG_DATA_HOME/opencode/auth.json` or
      `~/.local/share/opencode/auth.json` (legacy format).
+
+All these shapes are read on purpose. OpenCode 2.0 renamed provider `options`
+to `settings`, so a user who migrates their `opencode.json` to the native 2.0
+format would otherwise silently lose key discovery and be left looking at the
+last cached usage. Supporting the old, beta and new shapes costs a couple of
+dictionary lookups and keeps the app working across the next OpenCode
+evolution.
 
 Values may use OpenCode's variable substitution and are resolved by the app
 too: `{env:NAME}` reads an environment variable and `{file:path}` reads a file
