@@ -10,6 +10,9 @@ final class SettingsWindowController: NSWindowController {
     private let settings = Settings.shared
 
     private let keyField = NSSecureTextField()
+    private let keyFieldVisible = NSTextField()
+    private let revealKeyButton = NSButton()
+    private var isKeyRevealed = false
     private let sourceLabel = NSTextField(labelWithString: "")
     private let intervalPopup = NSPopUpButton()
     private let showPercentCheckbox = NSButton(
@@ -78,6 +81,21 @@ final class SettingsWindowController: NSWindowController {
         keyField.placeholderString = "Paste an OpenCode API key"
         keyField.translatesAutoresizingMaskIntoConstraints = false
 
+        // Mirror of the secure field, shown in clear text while the eye button
+        // is toggled on. Only one of the two is visible at a time.
+        keyFieldVisible.placeholderString = "Paste an OpenCode API key"
+        keyFieldVisible.translatesAutoresizingMaskIntoConstraints = false
+        keyFieldVisible.isHidden = true
+
+        revealKeyButton.target = self
+        revealKeyButton.action = #selector(toggleKeyVisibility)
+        revealKeyButton.isBordered = false
+        revealKeyButton.bezelStyle = .inline
+        revealKeyButton.imagePosition = .imageOnly
+        revealKeyButton.translatesAutoresizingMaskIntoConstraints = false
+        revealKeyButton.widthAnchor.constraint(equalToConstant: 22).isActive = true
+        updateRevealButton()
+
         let saveKeyButton = NSButton(title: "Save key", target: self, action: #selector(saveKey))
         let clearKeyButton = NSButton(title: "Clear", target: self, action: #selector(clearKey))
         for button in [saveKeyButton, clearKeyButton] {
@@ -85,7 +103,8 @@ final class SettingsWindowController: NSWindowController {
             button.translatesAutoresizingMaskIntoConstraints = false
         }
 
-        let keyRow = NSStackView(views: [keyField, saveKeyButton, clearKeyButton])
+        let keyRow = NSStackView(views: [keyField, keyFieldVisible, revealKeyButton, saveKeyButton, clearKeyButton])
+        keyRow.detachesHiddenViews = true
         keyRow.orientation = .horizontal
         keyRow.spacing = 8
         keyRow.translatesAutoresizingMaskIntoConstraints = false
@@ -207,6 +226,11 @@ final class SettingsWindowController: NSWindowController {
 
     private func refreshFromSettings() {
         keyField.stringValue = ""
+        keyFieldVisible.stringValue = ""
+        isKeyRevealed = false
+        keyField.isHidden = false
+        keyFieldVisible.isHidden = true
+        updateRevealButton()
 
         if let resolved = credentials.resolve() {
             sourceLabel.stringValue = "Using: \(resolved.sourceDescription)"
@@ -236,11 +260,26 @@ final class SettingsWindowController: NSWindowController {
     // MARK: - Actions
 
     @objc private func saveKey() {
-        let value = keyField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        let value = enteredKey
         guard !value.isEmpty else { return }
         credentials.setAppKey(value)
         refreshFromSettings()
         onSave?()
+    }
+
+    /// Shows or hides the key in clear text, keeping the same value in both
+    /// fields so that revealing it always reflects what was typed.
+    @objc private func toggleKeyVisibility() {
+        let value = isKeyRevealed ? keyFieldVisible.stringValue : keyField.stringValue
+        isKeyRevealed.toggle()
+        keyField.stringValue = value
+        keyFieldVisible.stringValue = value
+        keyField.isHidden = isKeyRevealed
+        keyFieldVisible.isHidden = !isKeyRevealed
+        updateRevealButton()
+        if let window {
+            window.makeFirstResponder(isKeyRevealed ? keyFieldVisible : keyField)
+        }
     }
 
     @objc private func clearKey() {
@@ -295,6 +334,19 @@ final class SettingsWindowController: NSWindowController {
     }
 
     // MARK: - Helpers
+
+    /// The key currently entered, from whichever of the two fields is visible.
+    private var enteredKey: String {
+        (isKeyRevealed ? keyFieldVisible.stringValue : keyField.stringValue)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private func updateRevealButton() {
+        let symbol = isKeyRevealed ? "eye.slash" : "eye"
+        let label = isKeyRevealed ? "Hide key" : "Show key"
+        revealKeyButton.image = NSImage(systemSymbolName: symbol, accessibilityDescription: label)
+        revealKeyButton.toolTip = label
+    }
 
     private func makeLabel(_ text: String) -> NSTextField {
         let label = NSTextField(labelWithString: text)

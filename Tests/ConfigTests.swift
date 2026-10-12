@@ -139,7 +139,10 @@ enum ConfigTests {
             )
 
             // The environment wins over the config file when no app key is set.
+            // Pass the app key explicitly so the test does not depend on the
+            // machine's Keychain.
             let resolved = CredentialStore.shared.resolve(
+                appKey: nil,
                 homeDirectory: home,
                 environment: ["OPENCODE_API_KEY": "sk-env"]
             )
@@ -151,8 +154,21 @@ enum ConfigTests {
             )
 
             // With no environment, the config file is used.
-            let fallback = CredentialStore.shared.resolve(homeDirectory: home, environment: [:])
+            let fallback = CredentialStore.shared.resolve(
+                appKey: nil,
+                homeDirectory: home,
+                environment: [:]
+            )
             checkEqual(fallback?.key, "sk-config", "falls back to the config file")
+
+            // An explicit app key still wins over the environment and config.
+            let appKey = CredentialStore.shared.resolve(
+                appKey: "sk-app",
+                homeDirectory: home,
+                environment: ["OPENCODE_API_KEY": "sk-env"]
+            )
+            checkEqual(appKey?.key, "sk-app", "app key beats the environment")
+            checkEqual(appKey?.source, .app, "reports the app source")
         }
     }
 

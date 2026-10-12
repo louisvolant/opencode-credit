@@ -54,6 +54,16 @@ final class CredentialStore {
         homeDirectory: URL = FileManager.default.homeDirectoryForCurrentUser,
         environment: [String: String] = ProcessInfo.processInfo.environment
     ) -> ResolvedKey? {
+        resolve(appKey: appKey, homeDirectory: homeDirectory, environment: environment)
+    }
+
+    /// Same as `resolve()`, but with an explicit app key. This keeps the
+    /// resolution order testable without depending on the machine's Keychain.
+    func resolve(
+        appKey: String?,
+        homeDirectory: URL = FileManager.default.homeDirectoryForCurrentUser,
+        environment: [String: String] = ProcessInfo.processInfo.environment
+    ) -> ResolvedKey? {
         if let key = appKey, !key.isEmpty {
             return ResolvedKey(key: key, source: .app)
         }

@@ -129,7 +129,8 @@ too: `{env:NAME}` reads an environment variable and `{file:path}` reads a file
 the key out of `opencode.json`.
 
 If nothing is found, paste a key in Settings. The settings window shows which
-source is currently in use.
+source is currently in use. Use the eye button next to the field to reveal the
+pasted key (and check it) before saving it.
 
 ### Zen credit balance
 
