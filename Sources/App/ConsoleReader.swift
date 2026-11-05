@@ -132,6 +132,9 @@ final class ConsoleReader: NSObject, WKNavigationDelegate {
                             self.finish(.success(balance))
                             return
                         }
+                        if extracted.use == nil {
+                            Diagnostics.log("console reader: credit available but switch element not identified in DOM")
+                        }
                         if !self.clicked {
                             self.clicked = true
                             Diagnostics.log("console reader: clicking Use credit switch -> \(target)")
@@ -200,23 +203,62 @@ final class ConsoleReader: NSObject, WKNavigationDelegate {
         }
       }
 
-      var use = null;
-      var input = findUseCreditInput();
-      if (input) { use = input.getAttribute("aria-checked") === "true"; }
+      var pattern = /(?:use\s*credits?|extra\s*usage)/i;
+      var el = findUseCreditElement();
+      var use = readSwitchState(el);
 
       if (credit === null && use === null) { return null; }
       return JSON.stringify({ credit: credit, use: use, isSignIn: false });
 
-      function findUseCreditInput() {
+      function findUseCreditElement() {
         var labels = Array.prototype.slice.call(document.querySelectorAll("label"));
         for (var i = 0; i < labels.length; i++) {
-          if ((labels[i].textContent || "").trim() === "Use credit") {
-            var el = labels[i].htmlFor ? document.getElementById(labels[i].htmlFor) : null;
-            if (!el && labels[i].parentElement) {
-              el = labels[i].parentElement.querySelector("input");
+          var label = labels[i];
+          var labelText = (label.textContent || "").trim();
+          if (pattern.test(labelText)) {
+            if (label.htmlFor) {
+              var target = document.getElementById(label.htmlFor);
+              if (target) { return target; }
             }
-            return el;
+            var inside = label.querySelector("button[role='switch'], [role='switch'], input[type='checkbox'], input");
+            if (inside) { return inside; }
+            if (label.parentElement) {
+              var sibling = label.parentElement.querySelector("button[role='switch'], [role='switch'], input[type='checkbox'], input");
+              if (sibling) { return sibling; }
+            }
+            var container = label.closest ? label.closest("div, section, tr, li") : null;
+            if (container) {
+              var control = container.querySelector("button[role='switch'], [role='switch'], input[type='checkbox'], input");
+              if (control) { return control; }
+            }
+            return label;
           }
+        }
+
+        var switches = Array.prototype.slice.call(document.querySelectorAll("button[role='switch'], [role='switch'], input[type='checkbox']"));
+        for (var j = 0; j < switches.length; j++) {
+          var sw = switches[j];
+          var aria = (sw.getAttribute("aria-label") || "") + " " + (sw.getAttribute("title") || "") + " " + (sw.getAttribute("name") || "");
+          if (pattern.test(aria)) { return sw; }
+        }
+
+        return null;
+      }
+
+      function readSwitchState(target) {
+        if (!target) { return null; }
+        if (target.hasAttribute && target.hasAttribute("aria-checked")) {
+          return target.getAttribute("aria-checked") === "true";
+        }
+        if (target.hasAttribute && target.hasAttribute("data-state")) {
+          return target.getAttribute("data-state") === "checked";
+        }
+        if (typeof target.checked === "boolean") {
+          return target.checked;
+        }
+        if (target.querySelector) {
+          var child = target.querySelector("button[role='switch'], [role='switch'], input[type='checkbox'], input");
+          if (child) { return readSwitchState(child); }
         }
         return null;
       }
@@ -227,16 +269,39 @@ final class ConsoleReader: NSObject, WKNavigationDelegate {
     /// (CSRF-protected) request.
     private static let clickScript = #"""
     (function() {
+      var pattern = /(?:use\s*credits?|extra\s*usage)/i;
       var labels = Array.prototype.slice.call(document.querySelectorAll("label"));
       for (var i = 0; i < labels.length; i++) {
-        if ((labels[i].textContent || "").trim() === "Use credit") {
-          var el = labels[i].htmlFor ? document.getElementById(labels[i].htmlFor) : null;
-          if (!el && labels[i].parentElement) {
-            el = labels[i].parentElement.querySelector("input");
+        var label = labels[i];
+        var labelText = (label.textContent || "").trim();
+        if (pattern.test(labelText)) {
+          if (label.htmlFor) {
+            var target = document.getElementById(label.htmlFor);
+            if (target) { target.click(); return true; }
           }
-          if (el) { el.click(); return true; }
+          var inside = label.querySelector("button[role='switch'], [role='switch'], input[type='checkbox'], input");
+          if (inside) { inside.click(); return true; }
+          if (label.parentElement) {
+            var sibling = label.parentElement.querySelector("button[role='switch'], [role='switch'], input[type='checkbox'], input");
+            if (sibling) { sibling.click(); return true; }
+          }
+          var container = label.closest ? label.closest("div, section, tr, li") : null;
+          if (container) {
+            var control = container.querySelector("button[role='switch'], [role='switch'], input[type='checkbox'], input");
+            if (control) { control.click(); return true; }
+          }
+          label.click();
+          return true;
         }
       }
+
+      var switches = Array.prototype.slice.call(document.querySelectorAll("button[role='switch'], [role='switch'], input[type='checkbox']"));
+      for (var j = 0; j < switches.length; j++) {
+        var sw = switches[j];
+        var aria = (sw.getAttribute("aria-label") || "") + " " + (sw.getAttribute("title") || "") + " " + (sw.getAttribute("name") || "");
+        if (pattern.test(aria)) { sw.click(); return true; }
+      }
+
       return false;
     })();
     """#

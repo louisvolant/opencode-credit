@@ -81,6 +81,19 @@ struct ZenBalance: Codable, Equatable, Sendable {
         self.useCredit = useCredit
         self.fetchedAt = fetchedAt
     }
+
+    /// Regular expression pattern matching console toggle labels like "Use credit",
+    /// "Use credits", or "Extra usage".
+    static let togglePattern = #"(?:use\s*credits?|extra\s*usage)"#
+
+    static func matchesToggleLabel(_ text: String?) -> Bool {
+        guard let text, !text.isEmpty else { return false }
+        guard let regex = try? NSRegularExpression(pattern: togglePattern, options: .caseInsensitive) else {
+            return false
+        }
+        let range = NSRange(text.startIndex..., in: text)
+        return regex.firstMatch(in: text, options: [], range: range) != nil
+    }
 }
 
 /// The three Go usage windows plus the moment they were fetched.

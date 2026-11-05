@@ -157,8 +157,9 @@ and reads your workspace **Go console page** (`/console/<workspace>/go`). The
 console is a client-side app, so the credit and the switch are read from the
 **rendered page**: the app loads it in a hidden web view and reads the DOM. The
 **Extra Usage** switch ("Use credit") can be toggled directly from the popover:
-the app clicks the real switch, so the console performs its own request. If the
-session expires (typically after 30 days), the app detects client-side redirects
+the app clicks the real switch, so the console performs its own request (supporting
+both `<button role="switch">` and checkbox controls with fuzzy label matching).
+If the session expires (typically after 30 days), the app detects client-side redirects
 immediately and surfaces a sign-in prompt so you can re-authenticate from
 Settings.
 

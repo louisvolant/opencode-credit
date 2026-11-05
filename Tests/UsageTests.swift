@@ -43,5 +43,16 @@ enum UsageTests {
             let decoded = try! JSONDecoder().decode(UsageSnapshot.self, from: encoded)
             checkEqual(decoded, original, "snapshot survives encode/decode")
         }
+
+        runSuite("ZenBalance toggle label matching") {
+            check(ZenBalance.matchesToggleLabel("Use credit"), "matches 'Use credit'")
+            check(ZenBalance.matchesToggleLabel("Use credits"), "matches 'Use credits'")
+            check(ZenBalance.matchesToggleLabel("USE CREDIT"), "matches uppercase 'USE CREDIT'")
+            check(ZenBalance.matchesToggleLabel("  Extra usage  "), "matches 'Extra usage' with padding")
+            check(ZenBalance.matchesToggleLabel("Extra usage (credit)"), "matches 'Extra usage (credit)'")
+            check(!ZenBalance.matchesToggleLabel("Monthly balance"), "ignores unrelated label")
+            check(!ZenBalance.matchesToggleLabel(""), "ignores empty string")
+            check(!ZenBalance.matchesToggleLabel(nil), "handles nil safely")
+        }
     }
 }
