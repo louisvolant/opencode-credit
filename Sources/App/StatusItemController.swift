@@ -29,7 +29,11 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
         popover.delegate = self
 
         popoverController.onRefresh = { [weak self] in self?.refreshService.refresh() }
-        popoverController.onOpenSettings = { [weak self] in self?.settingsWindowController.show() }
+        popoverController.onOpenSettings = { [weak self] in
+            guard let self else { return }
+            self.settingsWindowController.sessionStatusMessage = self.refreshService.balanceError
+            self.settingsWindowController.show()
+        }
         popoverController.onQuit = { NSApp.terminate(nil) }
         popoverController.onToggleUseCredit = { [weak self] enabled in
             self?.refreshService.setUseCredit(enabled)
@@ -54,6 +58,7 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
 
     private func render() {
         updateButton()
+        settingsWindowController.sessionStatusMessage = refreshService.balanceError
         popoverController.render(
             snapshot: refreshService.snapshot,
             status: refreshService.status,

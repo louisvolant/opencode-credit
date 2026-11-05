@@ -5,6 +5,11 @@ final class SettingsWindowController: NSWindowController {
     /// Called whenever a setting that affects the rest of the app changes.
     var onSave: (() -> Void)?
     var onClose: (() -> Void)?
+    var sessionStatusMessage: String? {
+        didSet {
+            if isWindowLoaded { refreshFromSettings() }
+        }
+    }
 
     private let credentials = CredentialStore.shared
     private let settings = Settings.shared
@@ -41,6 +46,7 @@ final class SettingsWindowController: NSWindowController {
     private lazy var loginWindowController: LoginWindowController = {
         let controller = LoginWindowController()
         controller.onSuccess = { [weak self] in
+            self?.sessionStatusMessage = nil
             self?.refreshFromSettings()
             self?.onSave?()
         }
@@ -238,7 +244,10 @@ final class SettingsWindowController: NSWindowController {
             sourceLabel.stringValue = "No key configured yet. Paste one above or set OPENCODE_API_KEY."
         }
 
-        if session.isConnected {
+        if let error = sessionStatusMessage, !error.isEmpty {
+            zenStatusLabel.stringValue = "\(error) Sign in to reconnect."
+            disconnectButton.isEnabled = session.isConnected
+        } else if session.isConnected {
             zenStatusLabel.stringValue = "Connected to your OpenCode workspace."
             disconnectButton.isEnabled = true
         } else {
@@ -324,6 +333,7 @@ final class SettingsWindowController: NSWindowController {
 
     @objc private func disconnect() {
         session.clear()
+        sessionStatusMessage = nil
         refreshFromSettings()
         onSave?()
     }

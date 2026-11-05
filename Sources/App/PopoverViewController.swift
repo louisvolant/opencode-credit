@@ -177,6 +177,11 @@ final class PopoverViewController: NSViewController {
             useCreditCheckbox.state = useCredit ? .on : .off
             useCreditCheckbox.isEnabled = true
             useCreditCheckbox.isHidden = false
+            if let error, !error.isEmpty {
+                useCreditCheckbox.toolTip = error
+            } else {
+                useCreditCheckbox.toolTip = "Use your balance after reaching the Go limits"
+            }
         } else {
             useCreditCheckbox.isHidden = true
         }
