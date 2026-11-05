@@ -52,6 +52,11 @@ final class ConsoleReader: NSObject, WKNavigationDelegate {
             frame: NSRect(x: 0, y: 0, width: 1280, height: 900),
             configuration: WKWebViewConfiguration()
         )
+        // Match desktop Safari user agent (same as LoginWindowController) so
+        // the client-side SPA and authentication checks behave consistently.
+        webView.customUserAgent =
+            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 "
+            + "(KHTML, like Gecko) Version/17.0 Safari/605.1.15"
         webView.navigationDelegate = self
         self.webView = webView
 
@@ -62,8 +67,8 @@ final class ConsoleReader: NSObject, WKNavigationDelegate {
     // MARK: - WKNavigationDelegate
 
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
-        if Self.isSignIn(webView.url) {
-            Diagnostics.log("console reader: redirected to sign-in")
+        if WorkspaceURL.isSignIn(url: webView.url) {
+            Diagnostics.log("console reader: redirected to sign-in on didFinish")
             finish(.failure(OpenCodeAPIError.sessionExpired))
             return
         }
@@ -87,35 +92,56 @@ final class ConsoleReader: NSObject, WKNavigationDelegate {
     private func poll() {
         guard let webView else { return }
 
-        webView.evaluateJavaScript(Self.extractScript) { [weak self] result, _ in
+        // Detect client-side SPA navigation to sign-in pages
+        if WorkspaceURL.isSignIn(url: webView.url) {
+            Diagnostics.log("console reader: redirected to sign-in at \(Diagnostics.describe(webView.url))")
+            finish(.failure(OpenCodeAPIError.sessionExpired))
+            return
+        }
+
+        webView.evaluateJavaScript(Self.extractScript) { [weak self] result, error in
             guard let self else { return }
 
-            if let extracted = Self.decode(result), let credit = extracted.credit {
-                let balance = ZenBalance(
-                    balanceUSD: credit,
-                    useCredit: extracted.use,
-                    fetchedAt: Date()
-                )
+            if let error {
+                Diagnostics.log("console reader: eval error: \(error.localizedDescription)")
+            }
 
-                switch self.request {
-                case .read:
-                    Diagnostics.log("console reader: extracted credit=\(credit) use=\(String(describing: extracted.use))")
-                    self.finish(.success(balance))
+            if let extracted = Self.decode(result) {
+                if extracted.isSignIn == true {
+                    Diagnostics.log("console reader: detected sign-in page in DOM/location")
+                    self.finish(.failure(OpenCodeAPIError.sessionExpired))
                     return
+                }
 
-                case .setExtraUsage(let target):
-                    if extracted.use == target {
-                        Diagnostics.log("console reader: switch is now \(target)")
+                if let credit = extracted.credit {
+                    let balance = ZenBalance(
+                        balanceUSD: credit,
+                        useCredit: extracted.use,
+                        fetchedAt: Date()
+                    )
+
+                    switch self.request {
+                    case .read:
+                        Diagnostics.log("console reader: extracted credit=\(credit) use=\(String(describing: extracted.use))")
                         self.finish(.success(balance))
                         return
-                    }
-                    if !self.clicked {
-                        self.clicked = true
-                        Diagnostics.log("console reader: clicking Use credit switch -> \(target)")
-                        webView.evaluateJavaScript(Self.clickScript) { _, _ in
-                            self.scheduleNextPoll()
+
+                    case .setExtraUsage(let target):
+                        if extracted.use == target {
+                            Diagnostics.log("console reader: switch is now \(target)")
+                            self.finish(.success(balance))
+                            return
                         }
-                        return
+                        if !self.clicked {
+                            self.clicked = true
+                            Diagnostics.log("console reader: clicking Use credit switch -> \(target)")
+                            webView.evaluateJavaScript(Self.clickScript) { clickResult, clickError in
+                                let ok = (clickResult as? Bool) ?? false
+                                Diagnostics.log("console reader: click result=\(ok) error=\(String(describing: clickError))")
+                                self.scheduleNextPoll()
+                            }
+                            return
+                        }
                     }
                 }
             }
@@ -127,7 +153,7 @@ final class ConsoleReader: NSObject, WKNavigationDelegate {
     private func scheduleNextPoll() {
         attempts += 1
         if attempts >= Self.maxAttempts {
-            Diagnostics.log("console reader: timed out")
+            Diagnostics.log("console reader: timed out url=\(Diagnostics.describe(webView?.url))")
             finish(.failure(OpenCodeAPIError.balanceUnavailable))
             return
         }
@@ -143,13 +169,6 @@ final class ConsoleReader: NSObject, WKNavigationDelegate {
         continuation.resume(with: result)
     }
 
-    private static func isSignIn(_ url: URL?) -> Bool {
-        guard let url else { return false }
-        if url.host == "auth.opencode.ai" { return true }
-        let path = url.path.lowercased()
-        return path.hasPrefix("/auth") || path.hasPrefix("/signin") || path.hasPrefix("/login")
-    }
-
     private static func decode(_ result: Any?) -> Extracted? {
         guard let json = result as? String, let data = json.data(using: .utf8) else { return nil }
         return try? JSONDecoder().decode(Extracted.self, from: data)
@@ -158,23 +177,35 @@ final class ConsoleReader: NSObject, WKNavigationDelegate {
     private struct Extracted: Decodable {
         let credit: Double?
         let use: Bool?
+        let isSignIn: Bool?
     }
 
-    /// Returns `{ "credit": 18.85, "use": false }`, or `null` until the page
-    /// has rendered. Reads the visible dollar amount and the "Use credit"
-    /// switch state.
+    /// Returns `{ "credit": 18.85, "use": false }`, or `{ "isSignIn": true }`,
+    /// or `null` until the page has rendered. Reads the visible dollar amount
+    /// and the "Use credit" switch state.
     private static let extractScript = #"""
     (function() {
+      var href = (window.location && window.location.href) || "";
+      if (href.indexOf("/auth") !== -1 || href.indexOf("/signin") !== -1 || href.indexOf("/login") !== -1 || href.indexOf("auth.opencode.ai") !== -1) {
+        return JSON.stringify({ isSignIn: true });
+      }
+
       var text = document.body ? document.body.innerText : "";
-      var m = text.match(/\$([0-9][0-9,]*\.[0-9]{2})\s*available credit/);
+      var m = text.match(/\$([0-9][0-9,]*\.[0-9]{2})\s*available credit/i);
       var credit = m ? Number(m[1].replace(/,/g, "")) : null;
+
+      if (credit === null) {
+        if (text.indexOf("Sign in to OpenCode") !== -1 || text.indexOf("Continue with GitHub") !== -1 || document.querySelector('form[action*="auth"], input[name="password"]')) {
+          return JSON.stringify({ isSignIn: true });
+        }
+      }
 
       var use = null;
       var input = findUseCreditInput();
       if (input) { use = input.getAttribute("aria-checked") === "true"; }
 
       if (credit === null && use === null) { return null; }
-      return JSON.stringify({ credit: credit, use: use });
+      return JSON.stringify({ credit: credit, use: use, isSignIn: false });
 
       function findUseCreditInput() {
         var labels = Array.prototype.slice.call(document.querySelectorAll("label"));

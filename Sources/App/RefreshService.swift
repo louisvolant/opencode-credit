@@ -175,6 +175,9 @@ final class RefreshService {
             } catch {
                 await MainActor.run {
                     self.balanceError = Self.message(for: error)
+                    if let apiError = error as? OpenCodeAPIError, apiError == .sessionExpired {
+                        self.balance = nil
+                    }
                     self.onUpdate?()
                 }
             }

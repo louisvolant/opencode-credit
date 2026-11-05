@@ -158,7 +158,9 @@ console is a client-side app, so the credit and the switch are read from the
 **rendered page**: the app loads it in a hidden web view and reads the DOM. The
 **Extra Usage** switch ("Use credit") can be toggled directly from the popover:
 the app clicks the real switch, so the console performs its own request. If the
-session expires, sign in again.
+session expires (typically after 30 days), the app detects client-side redirects
+immediately and surfaces a sign-in prompt so you can re-authenticate from
+Settings.
 
 ## How the data is fetched
 
@@ -192,9 +194,13 @@ session expires, sign in again.
   usage endpoint returns floored integers and can lag the console; the app
   shows exactly what the API returns. This is not a refresh or caching issue —
   the tooltip on the menu bar icon shows the last successful refresh time.
-- **The balance says "Not connected".** Sign in from Settings.
-- **The balance shows "—" or an error.** The console page changed. The rest of
-  the app is unaffected; please open an issue.
+- **The balance says "Not connected" or "Session expired".** Sign in from Settings.
+  OpenCode console sessions expire after roughly 30 days.
+- **The "Extra usage (credit)" switch reverts when clicked.** The console session
+  expired and the web view cannot click the toggle on the unauthenticated page.
+  Open Settings and click **Sign in…** to restore access.
+- **The balance shows "—" or an error.** The console page changed or could not be
+  loaded. The rest of the app is unaffected; please open an issue.
 - **"OpenCode Credit.app is damaged" when opening.** Remove the quarantine
   attribute as shown in the install section.
 - **Launch at login does not stick.** Move the app to `/Applications` first;

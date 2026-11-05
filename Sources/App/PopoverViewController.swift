@@ -162,7 +162,7 @@ final class PopoverViewController: NSViewController {
         if let balance {
             balanceLabel.stringValue = Formatting.currency(balance.balanceUSD)
             balanceLabel.textColor = .labelColor
-            balanceDetailLabel.stringValue = ""
+            balanceDetailLabel.stringValue = error ?? ""
         } else if isConnected {
             balanceLabel.stringValue = "—"
             balanceLabel.textColor = .secondaryLabelColor

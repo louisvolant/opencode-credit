@@ -30,4 +30,29 @@ enum WorkspaceURL {
         }
         return nil
     }
+
+    /// Determines whether a given URL points to a sign-in or authentication route.
+    static func isSignIn(url: URL?) -> Bool {
+        guard let url else { return false }
+        return isSignIn(string: url.absoluteString)
+    }
+
+    /// Determines whether a URL string or path belongs to an authentication flow.
+    static func isSignIn(string: String?) -> Bool {
+        guard let string, !string.isEmpty else { return false }
+
+        if let components = URLComponents(string: string), let host = components.host {
+            if host == "auth.opencode.ai" { return true }
+            let path = components.path.lowercased()
+            if path.hasPrefix("/auth") || path.hasPrefix("/signin") || path.hasPrefix("/login") {
+                return true
+            }
+        } else {
+            let lower = string.lowercased()
+            if lower.hasPrefix("/auth") || lower.hasPrefix("/signin") || lower.hasPrefix("/login") {
+                return true
+            }
+        }
+        return false
+    }
 }

@@ -34,5 +34,36 @@ enum WorkspaceTests {
                 "returns nil when there is no workspace"
             )
         }
+
+        runSuite("Sign-in URL detection") {
+            check(
+                WorkspaceURL.isSignIn(string: "https://auth.opencode.ai/oauth/authorize"),
+                "detects auth host"
+            )
+            check(
+                WorkspaceURL.isSignIn(string: "https://opencode.ai/auth"),
+                "detects /auth path"
+            )
+            check(
+                WorkspaceURL.isSignIn(string: "https://opencode.ai/signin"),
+                "detects /signin path"
+            )
+            check(
+                WorkspaceURL.isSignIn(string: "https://opencode.ai/login"),
+                "detects /login path"
+            )
+            check(
+                WorkspaceURL.isSignIn(string: "/auth?redirect=1"),
+                "detects relative /auth path"
+            )
+            check(
+                !WorkspaceURL.isSignIn(string: "https://opencode.ai/console/wrk_123/go"),
+                "ignores standard console page"
+            )
+            check(
+                !WorkspaceURL.isSignIn(string: nil),
+                "handles nil URL string safely"
+            )
+        }
     }
 }
