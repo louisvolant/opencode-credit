@@ -30,6 +30,7 @@ final class SettingsWindowController: NSWindowController {
         target: nil,
         action: nil
     )
+    private let launchAtLoginStatusLabel = NSTextField(labelWithString: "")
     private let notificationsCheckbox = NSButton(
         checkboxWithTitle: "Notify me when a window reaches",
         target: nil,
@@ -163,6 +164,13 @@ final class SettingsWindowController: NSWindowController {
         launchAtLoginCheckbox.action = #selector(launchAtLoginChanged)
         launchAtLoginCheckbox.translatesAutoresizingMaskIntoConstraints = false
 
+        launchAtLoginStatusLabel.font = .systemFont(ofSize: 11)
+        launchAtLoginStatusLabel.textColor = .secondaryLabelColor
+        launchAtLoginStatusLabel.maximumNumberOfLines = 2
+        launchAtLoginStatusLabel.lineBreakMode = .byWordWrapping
+        launchAtLoginStatusLabel.translatesAutoresizingMaskIntoConstraints = false
+        launchAtLoginStatusLabel.isHidden = true
+
         notificationsCheckbox.target = self
         notificationsCheckbox.action = #selector(notificationsChanged)
         notificationsCheckbox.translatesAutoresizingMaskIntoConstraints = false
@@ -203,6 +211,7 @@ final class SettingsWindowController: NSWindowController {
             intervalRow,
             showPercentCheckbox,
             launchAtLoginCheckbox,
+            launchAtLoginStatusLabel,
             makeSeparator(),
             makeSectionLabel("Notifications"),
             notificationsRow,
@@ -260,7 +269,29 @@ final class SettingsWindowController: NSWindowController {
         let index = intervalOptions.firstIndex(of: settings.refreshIntervalMinutes) ?? 1
         intervalPopup.selectItem(at: index)
         showPercentCheckbox.state = settings.showPercentInMenuBar ? .on : .off
-        launchAtLoginCheckbox.state = LaunchAtLogin.isEnabled ? .on : .off
+
+        switch LaunchAtLogin.status {
+        case .enabled:
+            launchAtLoginCheckbox.state = .on
+            launchAtLoginStatusLabel.stringValue = ""
+            launchAtLoginStatusLabel.isHidden = true
+        case .requiresApproval:
+            launchAtLoginCheckbox.state = .on
+            launchAtLoginStatusLabel.stringValue = "Requires approval in System Settings → General → Login Items."
+            launchAtLoginStatusLabel.textColor = .systemOrange
+            launchAtLoginStatusLabel.isHidden = false
+        case .notRegistered, .notFound:
+            launchAtLoginCheckbox.state = settings.launchAtStartupEnabled ? .on : .off
+            if settings.launchAtStartupEnabled {
+                launchAtLoginStatusLabel.stringValue = "Registration pending or app not located in /Applications."
+                launchAtLoginStatusLabel.textColor = .secondaryLabelColor
+                launchAtLoginStatusLabel.isHidden = false
+            } else {
+                launchAtLoginStatusLabel.stringValue = ""
+                launchAtLoginStatusLabel.isHidden = true
+            }
+        }
+
         notificationsCheckbox.state = settings.notificationsEnabled ? .on : .off
         thresholdPopup.isEnabled = settings.notificationsEnabled
         thresholdPopup.selectItem(at: thresholdOptions.firstIndex(of: settings.notificationThreshold) ?? 1)
@@ -310,10 +341,13 @@ final class SettingsWindowController: NSWindowController {
 
     @objc private func launchAtLoginChanged() {
         let enabled = launchAtLoginCheckbox.state == .on
-        if !LaunchAtLogin.setEnabled(enabled) {
-            // The system refused (for example the app is not in /Applications).
-            launchAtLoginCheckbox.state = LaunchAtLogin.isEnabled ? .on : .off
+        let success = LaunchAtLogin.setEnabled(enabled)
+        if !success {
+            launchAtLoginStatusLabel.stringValue = "Registration failed. Ensure the app is in /Applications."
+            launchAtLoginStatusLabel.textColor = .systemRed
+            launchAtLoginStatusLabel.isHidden = false
         }
+        refreshFromSettings()
     }
 
     @objc private func notificationsChanged() {

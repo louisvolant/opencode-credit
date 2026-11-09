@@ -1,9 +1,34 @@
+import AppKit
 import Foundation
 import ServiceManagement
 
 /// Wraps `SMAppService` so the settings UI can toggle launch at login/startup,
 /// and reconciles registration with the saved user preference across app updates.
 enum LaunchAtLogin {
+    enum Status: Equatable {
+        case enabled
+        case requiresApproval
+        case notRegistered
+        case notFound
+    }
+
+    static var status: Status {
+        let rawStatus = SMAppService.mainApp.status
+        Diagnostics.log("launch at startup: status check -> \(rawStatus.rawValue)")
+        switch rawStatus {
+        case .enabled:
+            return .enabled
+        case .requiresApproval:
+            return .requiresApproval
+        case .notRegistered:
+            return .notRegistered
+        case .notFound:
+            return .notFound
+        @unknown default:
+            return .notRegistered
+        }
+    }
+
     static var isEnabled: Bool {
         SMAppService.mainApp.status == .enabled
     }
@@ -14,7 +39,7 @@ enum LaunchAtLogin {
     @discardableResult
     static func syncWithSettings(settings: Settings = .shared) -> Bool {
         let serviceStatus = SMAppService.mainApp.status
-        // If the preference was never explicitly stored, adopt the current enabled state.
+        // If the preference was never explicitly stored, adopt current enabled state.
         if !settings.hasConfiguredLaunchAtStartup && serviceStatus == .enabled {
             settings.launchAtStartupEnabled = true
             return true
@@ -51,6 +76,13 @@ enum LaunchAtLogin {
         } catch {
             Diagnostics.log("launch at startup: SMAppService error: \(error.localizedDescription)")
             return false
+        }
+    }
+
+    /// Opens macOS System Settings to the Login Items pane.
+    static func openSystemSettings() {
+        if let url = URL(string: "x-apple.systempreferences:com.apple.LoginItems-Settings.extension") {
+            NSWorkspace.shared.open(url)
         }
     }
 }
