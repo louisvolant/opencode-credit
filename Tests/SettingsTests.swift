@@ -16,12 +16,20 @@ enum SettingsTests {
             checkEqual(settings.showPercentInMenuBar, true, "the percentage is shown by default")
             checkEqual(settings.notificationsEnabled, false, "notifications are off by default")
             checkEqual(settings.notificationThreshold, 80, "the default threshold is 80%")
+            checkEqual(settings.launchAtStartupEnabled, false, "launch at startup is off by default")
+            checkEqual(settings.hasConfiguredLaunchAtStartup, false, "launch at startup is not configured initially")
             checkEqual(settings.cachedUsage, nil, "there is no cached usage initially")
 
             settings.refreshIntervalMinutes = 15
             settings.showPercentInMenuBar = false
+            settings.launchAtStartupEnabled = true
             checkEqual(settings.refreshIntervalMinutes, 15, "the interval persists")
             checkEqual(settings.showPercentInMenuBar, false, "the menu bar option persists")
+            checkEqual(settings.launchAtStartupEnabled, true, "launch at startup persists")
+            checkEqual(settings.hasConfiguredLaunchAtStartup, true, "reports as configured after saving")
+
+            settings.launchAtStartupEnabled = false
+            checkEqual(settings.launchAtStartupEnabled, false, "launch at startup can be toggled off")
 
             let snapshot = UsageSnapshot(
                 rolling: UsageWindow(status: .ok, percent: 42, resetsAt: Date(timeIntervalSince1970: 1_700_000_000)),

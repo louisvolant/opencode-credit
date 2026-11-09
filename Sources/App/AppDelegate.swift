@@ -5,6 +5,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         installMainMenu()
+        LaunchAtLogin.syncWithSettings()
         statusItemController = StatusItemController()
     }
 

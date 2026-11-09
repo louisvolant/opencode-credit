@@ -16,6 +16,7 @@ final class Settings {
         static let notificationsEnabled = "notificationsEnabled"
         static let notificationThreshold = "notificationThreshold"
         static let cachedUsage = "cachedUsage"
+        static let launchAtStartupEnabled = "launchAtStartupEnabled"
     }
 
     /// How often the app refreshes, in minutes. Defaults to 5.
@@ -56,6 +57,17 @@ final class Settings {
         set {
             defaults.set(newValue, forKey: Key.notificationThreshold)
         }
+    }
+
+    /// Whether the user has explicitly set the launch-at-startup preference.
+    var hasConfiguredLaunchAtStartup: Bool {
+        defaults.object(forKey: Key.launchAtStartupEnabled) != nil
+    }
+
+    /// Whether the app should launch automatically at login/startup.
+    var launchAtStartupEnabled: Bool {
+        get { defaults.bool(forKey: Key.launchAtStartupEnabled) }
+        set { defaults.set(newValue, forKey: Key.launchAtStartupEnabled) }
     }
 
     /// Last successful snapshot, cached so the app can render offline.
