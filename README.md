@@ -22,7 +22,7 @@ Command Line Tools.
 - The OpenCode logo in the menu bar next to the rolling percentage,
   colour-coded green / orange / red.
 - Automatic refresh every 5 minutes (configurable) and a manual refresh button.
-- Optional threshold notifications, launch at login, and a percentage-free
+- Optional threshold notifications, launch at startup, and a percentage-free
   menu bar.
 
 ## Requirements
@@ -204,8 +204,11 @@ can re-authenticate quickly.
   loaded. The rest of the app is unaffected; please open an issue.
 - **"OpenCode Credit.app is damaged" when opening.** Remove the quarantine
   attribute as shown in the install section.
-- **Launch at login does not stick.** Move the app to `/Applications` first;
-  macOS is stricter about registering apps from other locations.
+- **Launch at startup does not stick or was reset.** Move the app to `/Applications` first;
+  macOS is stricter about registering apps from other locations. The app persists your
+  startup preference and automatically reconciles its background registration whenever
+  launched (including after updating the `.app` bundle). If macOS shows a notification
+  requiring approval, verify the toggle under **System Settings → General → Login Items & Extensions**.
 
 ## Development
 

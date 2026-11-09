@@ -26,7 +26,7 @@ final class SettingsWindowController: NSWindowController {
         action: nil
     )
     private let launchAtLoginCheckbox = NSButton(
-        checkboxWithTitle: "Launch at login",
+        checkboxWithTitle: "Launch at startup",
         target: nil,
         action: nil
     )
@@ -162,6 +162,7 @@ final class SettingsWindowController: NSWindowController {
 
         launchAtLoginCheckbox.target = self
         launchAtLoginCheckbox.action = #selector(launchAtLoginChanged)
+        launchAtLoginCheckbox.toolTip = "Opens OpenCode Credit automatically when your Mac starts up and you log in"
         launchAtLoginCheckbox.translatesAutoresizingMaskIntoConstraints = false
 
         launchAtLoginStatusLabel.font = .systemFont(ofSize: 11)
