@@ -14,13 +14,16 @@ Command Line Tools.
 
 ## Features
 
-- **Rolling usage** — percentage of the 5-hour window, with a reset countdown.
-- **Weekly usage** — percentage of the weekly window, with a reset countdown.
-- **Monthly usage** — percentage of the monthly window, with a reset countdown.
+- **Rolling usage** — percentage of the 5-hour window **used**, with a reset
+  countdown.
+- **Weekly usage** — percentage of the weekly window **used**, with a reset
+  countdown.
+- **Monthly usage** — percentage of the monthly window **used**, with a reset
+  countdown.
 - **OpenCode Zen credit** — available balance in USD, and a toggle for the
   "Extra Usage" (use credit) switch.
-- The OpenCode logo in the menu bar next to the rolling percentage,
-  colour-coded green / orange / red.
+- The OpenCode logo in the menu bar next to the rolling used percentage,
+  colour-coded green / orange / red (green while little has been used).
 - Automatic refresh every 5 minutes (configurable) and a manual refresh button.
 - Optional threshold notifications, launch at startup, and a percentage-free
   menu bar.
@@ -167,9 +170,11 @@ can re-authenticate quickly.
 
 - **Go usage** uses the official API-key endpoint:
   `GET https://opencode.ai/zen/go/v1/usage` with an `Authorization: Bearer`
-  header. This is stable. Note that the endpoint returns **integer**
-  percentages (floored) that can lag the web console by up to one point — e.g.
-  the app may show 79% while the console shows 80%.
+  header. This is stable. The endpoint reports the percentage **used**, while
+  the OpenCode console shows the percentage **left**; the two are complementary
+  (`used = 100 − left`) and are not expected to match. The endpoint returns
+  **integer** percentages (floored), so it can lag the console by up to one
+  point — e.g. the app may show 5% used while the console shows 95% left.
 - **Zen credit** is not exposed by the API (`/zen/v1/balance` returns 404), so
   the app loads your workspace Go console page in a hidden web view and reads
   the rendered DOM for the available credit and the **Extra Usage** switch.
@@ -191,10 +196,11 @@ can re-authenticate quickly.
   Settings. "The API key was rejected" means the key is invalid.
 - **"No OpenCode Go subscription found for this key."** The usage endpoint only
   exists for accounts with a Go subscription.
-- **The percentage is one point lower than the web console.** The official
-  usage endpoint returns floored integers and can lag the console; the app
-  shows exactly what the API returns. This is not a refresh or caching issue —
-  the tooltip on the menu bar icon shows the last successful refresh time.
+- **The percentage does not match the web console.** The app shows the
+  percentage **used**; the console shows the percentage **left**. They are
+  complements (`used = 100 − left`), so a console "95% left" matches an app
+  "5% used". This is not a refresh or caching issue — the tooltip on the menu
+  bar icon shows the last successful refresh time.
 - **The balance says "Not connected" or "Session expired".** Sign in from Settings.
   OpenCode console sessions expire after roughly 30 days.
 - **The "Extra usage (credit)" switch reverts when clicked.** The console session
